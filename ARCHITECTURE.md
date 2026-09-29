@@ -29,6 +29,7 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
 Folders may be empty until the backlog item that needs them is in progress.
 
 ## [ADR-01] Folder structure by feature, not by type
+
 Date: 2026-09-28
 
 Decision: we group code by feature (`src/features/chat/`), and inside each feature by role (`components/`, `hooks/`, `model/`). Nothing is shared until a second feature needs it.
@@ -38,6 +39,7 @@ Reason: the agent finds all the context for a feature in one folder, which reduc
 Rejected alternative: top-level `components/`, `hooks/`, `types/`. Rejected because understanding one screen would force the agent (and me) to jump across four folders, and unrelated code would end up loaded in the same context.
 
 ## [ADR-02] Vite + React SPA instead of Next.js
+
 Date: 2026-09-28
 
 Decision: the app is a client-side single-page application built with Vite 8 and React 19.
@@ -47,6 +49,7 @@ Reason: in Sprint 1 the app has no server logic at all. Vite gives a one-command
 Rejected alternative: Next.js. Rejected for now because its server/client split and build conventions add complexity we don't need until inference exists. When B-03 needs a server to hold the API key, we will add a minimal server (see ADR-03) and revisit this decision in a new ADR.
 
 ## [ADR-03] Inference behind one interface, selected by an environment variable, keys only on the server
+
 Date: 2026-09-28
 
 Decision: every call to a language model goes through a single `InferenceEngine` interface with one implementation per provider (`anthropic`, `ollama`). The active one is chosen by `INFERENCE_ENGINE` at startup. Provider keys are read only by server-side code; the browser talks to our own endpoint, never to a provider.
@@ -64,6 +67,7 @@ This section documents the engine switch for both the development harness (the a
 - When to switch: when API credits run out, when the API is down, or when the content is sensitive and must not leave the machine.
 
 ### Switching the app (B-03, B-04)
+
 Set the variable in `.env` (copy it from `.env.example`) and restart:
 
 ```
@@ -78,6 +82,7 @@ npm run engine:check
 ```
 
 ### Switching the harness (the coding agent)
+
 Ollama 0.14+ exposes an Anthropic-compatible API, so Claude Code can run against the local model without any code change. In PowerShell:
 
 ```powershell
