@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment (secrets never committed; .env.example is)
+.env
+.env.*
+!.env.example
+
+# Local agent settings
+.claude/settings.local.json
+
+# Editors and OS
+.idea/
+.DS_Store
+Thumbs.db
