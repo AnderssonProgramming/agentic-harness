@@ -49,6 +49,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - Installing, upgrading or removing any dependency that is not in "Approved dependencies" without asking me first. This includes `npx` commands that download packages.
 - Editing deployment or CI configuration (`.github/`, `vercel.json`, `Dockerfile`, any `*.deploy.*` file).
 - Writing API keys, tokens or secrets in code, docs or commits. They go in `.env` (git-ignored). Only `.env.example` with empty values is committed.
+- Exposing a secret to the browser in any form. Never prefix a secret with `VITE_` (Vite inlines every `VITE_*` variable into the public bundle), and never read a key from browser code, hooks included. Keys are read only by server-side code (ARCHITECTURE.md, ADR-03).
 - Committing directly without showing me the diff summary first, or using `--no-verify`.
 - Generating code you cannot explain to me in three lines.
 - Disabling a lint rule or TypeScript check to make an error go away.
