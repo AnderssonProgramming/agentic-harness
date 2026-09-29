@@ -23,7 +23,7 @@ async function checkAnthropic() {
 }
 
 async function checkOllama() {
-  const baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+  const baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
   const model = process.env.OLLAMA_MODEL ?? 'phi3';
   let res;
   try {

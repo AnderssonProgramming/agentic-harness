@@ -86,7 +86,7 @@ npm run engine:check
 Ollama 0.14+ exposes an Anthropic-compatible API, so Claude Code can run against the local model without any code change. In PowerShell:
 
 ```powershell
-$env:ANTHROPIC_BASE_URL = "http://localhost:11434"
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:11434"
 $env:ANTHROPIC_AUTH_TOKEN = "ollama"
 $env:ANTHROPIC_API_KEY = ""
 claude --model phi3

@@ -55,7 +55,7 @@ As a junior developer I want the assistant to keep working when API credits run 
 
 Acceptance criteria:
 
-- Setting `INFERENCE_ENGINE=ollama` routes every request to `http://localhost:11434` using the model in `OLLAMA_MODEL` (default `phi3`).
+- Setting `INFERENCE_ENGINE=ollama` routes every request to `http://127.0.0.1:11434` using the model in `OLLAMA_MODEL` (default `phi3`).
 - Switching engines requires only changing the environment variable and restarting; no code changes.
 - `npm run engine:check` reports which engine is active and whether it answered.
 
