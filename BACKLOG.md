@@ -46,7 +46,7 @@ Acceptance criteria:
 - The API key is read only on the server side from `ANTHROPIC_API_KEY`; it never appears in the browser bundle (verified by searching `dist/`).
 - While waiting, the UI shows a "thinking" indicator; the reply appears as an assistant message.
 
-Status: pending
+Status: in progress
 
 ## Priority 2
 
@@ -60,7 +60,7 @@ Acceptance criteria:
 - Switching engines requires only changing the environment variable and restarting; no code changes.
 - `npm run engine:check` reports which engine is active and whether it answered.
 
-Status: pending
+Status: in progress
 
 ### [B-05] Clear error states
 
@@ -72,7 +72,7 @@ Acceptance criteria:
 - Error messages name the active engine (e.g. "Ollama is not running on localhost:11434").
 - A failed request never deletes the user's message.
 
-Status: pending
+Status: in progress
 
 ### [B-06] Onboarding knowledge base
 
@@ -122,7 +122,7 @@ Acceptance criteria:
 - Streaming works with both engines.
 - A "Stop" button interrupts the reply and keeps the partial text.
 
-Status: pending
+Status: in progress
 
 ### [B-10] Starter questions
 

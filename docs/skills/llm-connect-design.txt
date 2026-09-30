@@ -1,0 +1,84 @@
+SKILL 2 DESIGN: llm-connect (plain text, day 6)
+
+1. NAME AND DESCRIPTION
+llm-connect. Generates the conversational connection to a language model:
+a server-side chat endpoint (keys never reach the browser), engine adapters
+for Anthropic, Ollama and a deterministic mock, streaming, history trimming,
+and a typed browser client that turns every failure into a clear error code.
+Use it when a project needs to talk to an LLM for the first time: "connect
+the chat to the model", "add the LLM client", "/llm-connect". Do NOT use it
+to wire the client into a specific screen (that's feature work with a plan),
+to add a new provider to an existing connection, or to change prompts later.
+
+2. TRIGGER
+/llm-connect [--route /api/chat] [--default-engine anthropic|ollama|mock]
+or words such as "connect the app to the model" or "generate the LLM client".
+
+3. INPUTS
+- system: one paragraph that tells the model who it is. Required. Ask if
+  missing; never invent the product's persona.
+- route: HTTP path of the endpoint. Default /api/chat.
+- default engine: anthropic | ollama | mock. Default anthropic.
+- anthropic model: default claude-sonnet-5. Ollama model: default phi3.
+- history budget: max characters of history sent per call. Default 24000.
+- backlog item ID the connection serves (e.g. B-03). Required, same rule
+  as new-route: it must exist and not be done.
+Stop and ask when: server/llm/ or src/shared/llm/ already exist, or
+vite.config.ts doesn't have the expected plugins line.
+
+4. WHAT THE GENERATED CODE MUST COVER
+Message structure : system prompt kept on the server; history is an array
+                    of {role: user|assistant, content}; roles validated.
+History           : the whole conversation is sent every call; when it
+                    exceeds the budget, the oldest turns are dropped, and it
+                    always starts with a user turn and ends with the newest
+                    user message.
+Streaming         : Anthropic SSE and Ollama NDJSON are normalized on the
+                    server into one NDJSON stream of events:
+                    {type: delta, text} ... {type: done}
+                    or {type: error, error: {code, message, retryable}}.
+                    The browser renders deltas as they arrive.
+Network errors    : browser offline or server unreachable -> network;
+                    no data for 20 s -> timeout; stream cut off or not
+                    NDJSON -> malformed; provider unreachable -> engine_unreachable.
+API errors        : 401/403 -> auth; 429 -> rate_limit; out of credits
+                    -> quota; 529/503 -> overloaded; unknown model -> model_not_found;
+                    missing key or bad engine name -> config.
+Secrets           : keys read on the server from process env / .env without a
+                    VITE_ prefix; .env.example lists every variable with an
+                    empty value; the verify step greps the production bundle
+                    for key names and values.
+Cancellation      : the browser can abort; the server then aborts the
+                    upstream request too.
+
+5. STEPS
+1. Check scope (item ID exists, not done) and that the targets are free.
+2. Run the generator:
+   node .claude/skills/llm-connect/scaffold.mjs --system "<text>"
+        [--route ...] [--default-engine ...] [--anthropic-model ...]
+        [--ollama-model ...] [--history-chars ...]
+   It writes server/llm/*, src/shared/llm/*, scripts/verify-llm.mjs, patches
+   vite.config.ts, tsconfig.node.json, package.json and .env.example, or
+   changes nothing and exits 1.
+3. npm run format, then npm run check (the generated tests cover every error
+   code with mocked fetch). Fix only generated files; max 2 attempts.
+4. npm run verify:llm. It starts the dev server with the plugin and hits the
+   real endpoint: mock stream, history reaches the engine, malformed request,
+   unreachable engine, invalid Anthropic key (if a key is configured), and a
+   production build scanned for secrets.
+5. git status: only the files the generator listed.
+6. Report. Don't commit.
+
+6. OUTPUT
+server/llm/: protocol re-export, errors, history, lines (SSE/NDJSON reader),
+engines/anthropic, engines/ollama, engines/mock, engine (selection), system
+prompt, handler, vite plugin, and tests.
+src/shared/llm/: protocol (shared types), errors (user-facing messages),
+client (streamChat), and tests.
+scripts/verify-llm.mjs, plus 4 small patches.
+
+7. VERIFICATION
+- npm run check exits 0.
+- npm run verify:llm exits 0.
+- No key name or value in dist/ (part of verify:llm).
+- git status shows only the generator's files.
