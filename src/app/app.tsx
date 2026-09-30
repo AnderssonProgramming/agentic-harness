@@ -1,4 +1,5 @@
 import { AppNav } from './app-nav';
+import { useDocumentTitle } from './hooks/use-document-title';
 import { useRoute } from './hooks/use-route';
 import { NotFound } from './not-found';
 import { findRoute, normalizePath, routes } from './routes';
@@ -6,6 +7,7 @@ import { findRoute, normalizePath, routes } from './routes';
 export function App() {
   const { path, navigate } = useRoute();
   const route = findRoute(path);
+  useDocumentTitle(route?.title ?? 'Page not found');
 
   return (
     <main className="app">

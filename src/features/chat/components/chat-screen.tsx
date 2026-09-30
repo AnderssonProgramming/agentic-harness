@@ -9,7 +9,10 @@ export function ChatScreen() {
   const scrollRef = useAutoScroll<HTMLDivElement>(messages.length);
 
   return (
-    <section className="chat" aria-label="Chat with Compass">
+    <section className="chat" aria-labelledby="chat-title">
+      <h2 id="chat-title" className="visually-hidden">
+        Chat
+      </h2>
       <div className="chat__scroll" ref={scrollRef}>
         <MessageList messages={messages} />
       </div>
