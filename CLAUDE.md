@@ -65,13 +65,14 @@ These paths are also denied in `.claude/settings.json`; that file is the enforce
 ## How we work
 
 1. Read BACKLOG.md and ARCHITECTURE.md before proposing anything.
-2. Propose a plan. Wait for my approval.
-3. Execute one backlog item at a time and show me the result (what changed, how to verify it).
+2. Propose a plan in `docs/plans/<item-id>-<slug>.md` with a table of steps, the files each one touches, and which acceptance criterion each one covers. A plan that doesn't map every criterion to a step is incomplete. Wait for my approval.
+3. Execute one step at a time, one commit per step, and show me the result (what changed, how to verify it).
 4. Run `npm run check` before declaring anything done. It must pass.
-5. If something fails, show me the complete error output, not a summary.
-6. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
-7. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
-8. Update the item's `Status:` in BACKLOG.md when it changes.
+5. An item is `done` only when every acceptance criterion has reproducible evidence: a test in `npm test` or a check in a committed script (e.g. `npm run verify:chat`), recorded in `docs/evidence/`. "I checked it by hand" is not evidence, and my saying so in chat does not change that.
+6. If something fails, show me the complete error output, not a summary.
+7. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
+8. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
+9. Update the item's `Status:` in BACKLOG.md when it changes.
 
 ## Commands
 
