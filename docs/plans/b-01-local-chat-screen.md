@@ -1,6 +1,6 @@
 # Plan: B-01 Local chat screen (+ B-02 composer basics)
 
-Status: approved by the Product Owner on 2026-09-30 (as written; test dependencies authorized).
+Status: done. Approved by the Product Owner on 2026-09-30 (as written; test dependencies authorized) and executed as 11 steps; evidence in `docs/evidence/b-01-verification.md`.
 Sources read: `CLAUDE.md`, `BACKLOG.md` (B-01, B-02), `ARCHITECTURE.md` (ADR-01 to ADR-03).
 
 ## Scope

@@ -20,7 +20,7 @@ Acceptance criteria:
 - With 50 messages in the history, the screen stays responsive: sending a new message renders in under 100 ms.
 - With no messages, the list shows a short explanation of what Compass is and what to type, instead of a blank area.
 
-Status: in progress
+Status: done
 
 ### [B-02] Message composer behavior
 
@@ -33,7 +33,7 @@ Acceptance criteria:
 - After sending, the input is cleared and keeps focus.
 - Messages longer than 4,000 characters are blocked with a visible counter.
 
-Status: in progress
+Status: done
 
 ### [B-03] Inference engine adapter (Anthropic by default)
 
