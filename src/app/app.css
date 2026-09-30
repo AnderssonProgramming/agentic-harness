@@ -2,14 +2,67 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-text: #1b1b1f;
+  --color-muted: #5f6068;
+  --color-border: #dcdce0;
+  --color-accent: #2f5fd0;
+  --color-on-accent: #ffffff;
+  --color-danger: #b3261e;
+  --radius: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #141417;
+    --color-surface: #1f1f24;
+    --color-text: #ececf1;
+    --color-muted: #a1a1ab;
+    --color-border: #34343c;
+    --color-accent: #7ea2ff;
+    --color-on-accent: #0d1530;
+    --color-danger: #ffb4ab;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
   max-width: 48rem;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 1rem;
+}
+
+.app__header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.app__header p {
+  margin: 0 0 0.75rem;
+  color: var(--color-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

@@ -1,3 +1,4 @@
+import '../chat.css';
 import { useAutoScroll } from '../hooks/use-auto-scroll';
 import { useChat } from '../hooks/use-chat';
 import { Composer } from './composer';
