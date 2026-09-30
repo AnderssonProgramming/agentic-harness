@@ -38,6 +38,8 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 
 - `any` is forbidden. The only exception is a line with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- <written reason>`; the reason is mandatory and enforced by the linter.
 - UI components receive all their data and callbacks through props. Components never fetch, never read `localStorage`, and never call the inference engine directly. Side effects live in hooks under `src/features/<feature>/hooks/`.
+- Only the feature's composition component (e.g. `ChatScreen`) calls feature hooks. Presentational components may keep ephemeral input state (a draft, an open/closed toggle) and DOM refs, nothing else (ADR-04).
+- A disabled control is never the only guard. Every handler re-checks the same validation function from `model/` that decides the disabled state, because keyboard shortcuts bypass buttons.
 - Pure functions before classes. Classes are forbidden unless a third-party API requires one.
 - File and folder names are kebab-case (`message-list.tsx`, `use-chat.ts`). Component names are PascalCase inside the file.
 - One component per file. Named exports only; no default exports except where a tool requires one (`vite.config.ts`, `eslint.config.js`).
