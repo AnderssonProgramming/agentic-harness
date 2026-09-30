@@ -20,13 +20,17 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
     ├── app/                # app shell: root component and global styles
     ├── features/
     │   └── chat/           # everything for the chat screen (B-01, B-02)
-    │       ├── components/ # presentational components, data via props only
-    │       ├── hooks/      # state and side effects for the feature
-    │       └── model/      # types and pure functions (no React)
+    │       ├── index.ts    # public surface of the feature: exports ChatScreen only
+    │       ├── chat.css    # styles for this feature only
+    │       ├── components/ # chat-screen (composition), message-list, composer
+    │       ├── hooks/      # use-chat (messages), use-auto-scroll
+    │       └── model/      # message.ts: types and pure functions (no React)
     └── shared/             # code used by two or more features
 ```
 
 Folders may be empty until the backlog item that needs them is in progress.
+Tests live next to the file they test (`message.ts` → `message.test.ts`).
+Other features import a feature only through its `index.ts`, never its internal files.
 
 ## [ADR-01] Folder structure by feature, not by type
 
@@ -57,6 +61,26 @@ Decision: every call to a language model goes through a single `InferenceEngine`
 Reason: switching engines when credits run out must be a config change, not a code change. And any key shipped to the browser is a leaked key: Vite inlines every `VITE_*` variable into the public bundle.
 
 Rejected alternative: calling the Anthropic API directly from React with a `VITE_ANTHROPIC_API_KEY`. Rejected because it exposes the key to every user and couples UI components to a specific provider.
+
+## [ADR-04] Conversation state in a feature hook with `useState`, no state library
+
+Date: 2026-09-30
+
+Decision: the list of messages lives in `useChat` (`src/features/chat/hooks/use-chat.ts`) as React `useState`, and every change goes through the pure functions in `model/message.ts`. `ChatScreen` is the only component that calls the hooks; `MessageList` and `Composer` receive data and callbacks through props. The one exception is the composer's draft text, which is ephemeral input state and stays local to `Composer`.
+
+Reason: one screen with one list does not need a global store. Keeping the transitions in pure functions means they are unit-tested without React (7 tests), and when B-03 and B-08 arrive, only the hook changes: it will call the engine and storage, while the components stay the same.
+
+Rejected alternative: a state library (Redux Toolkit, Zustand) or React Context. Rejected because it would add a dependency and a second place to look for state, with no second consumer to justify it. We will revisit when a second feature needs the conversation.
+
+## [ADR-05] Fixed local assistant reply until the model is connected
+
+Date: 2026-09-30
+
+Decision: every accepted user message is followed by a fixed assistant message (`PLACEHOLDER_REPLY` in `model/message.ts`) that says the model connection arrives with B-03.
+
+Reason: B-01 requires user and assistant messages to be visually distinct, which can't be verified without assistant messages. Sprint 1 forbids any model call. A fixed, honest reply satisfies both, and B-03 replaces it at a single point (`appendExchange`).
+
+Rejected alternative: echoing the user's text back, or scripted fake answers. Rejected because both look like the assistant is answering, which would mislead a user and hide that the product doesn't think yet.
 
 ## Inference engine
 
