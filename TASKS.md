@@ -51,4 +51,18 @@ Score = times done × average minutes. It is the potential saving per sprint.
 
 ## Before and after
 
-Filled in on day 5, after the reliability test.
+### [T-01] Add a new screen → `new-route` skill
+
+|                             | Before (B-01, by hand with the agent, step by step)                                                                                                                                                     | With the skill                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Agent wall-clock            | **36 min** measured for the chat screen, of which 28 min was one failure loop; **~6 min** for the layered skeleton alone (model, hooks, view, screen, styles: `2366392` → `129e655` minus the composer) | **2.5 min** (146, 156 and 155 s in the reliability runs) |
+| Browser verification        | 18 min the first time (writing and debugging the script), then manual per screen                                                                                                                        | Included: `verify:route` runs as step 5, 6 checks        |
+| Manual steps / PO approvals | 9 steps, each needing a PO review before the next                                                                                                                                                       | **1 request**, one review of the final report            |
+| Output consistency          | Depends on the session                                                                                                                                                                                  | Same 8 files, same structure, 3/3 runs                   |
+
+- **Saving per use, conservative:** 3.5 min of agent time (6 → 2.5), plus 8 PO review turns. At about 2 minutes per review, that's ~16 min of PO time, for **~20 min per screen**. The 2 min per review is an estimate; the rest is measured.
+- **Saving per use against the measured B-01 run:** 36 + 18 min → 2.5 min. That overstates it, because the chat screen had real features the skeleton doesn't.
+- **Estimated uses:** ~1 per week (B-06, B-07 and a settings screen are candidates). That's **~20 min per week** conservatively.
+- **Cost:** about USD 0.33–0.48 in model usage per run.
+
+The largest saving isn't minutes but consistency: every screen arrives with the same layers, loading and error states, tests and a browser check, and the skill refuses to build what isn't in the backlog.
