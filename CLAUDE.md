@@ -83,7 +83,7 @@ Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill,
 
 A listed skill's `SKILL.md` is a plan I have already approved. When I ask for a skill, you don't write a new plan for its steps. That approval covers **how**, never **what**: the work must still trace to a backlog item, and must not contradict an ADR. If it doesn't, stop and ask, as in any other task.
 
-- None yet. `new-route` is in its reliability test.
+- `new-route`: adds a new top-level screen (route, feature folder, typed view, state hook with loading and error states, `api/` integration point) and verifies it in a real browser. Use it when asked for a new screen, page, route or section, or via `/new-route <name> [path] [title]`. Don't use it to change an existing screen. Reliability evidence: `docs/evidence/skill-new-route-reliability.md`.
 
 A skill is only listed here after it has passed the reliability test: three runs in a row, in fresh sessions, with no manual touch-ups (evidence in `docs/evidence/`).
 
