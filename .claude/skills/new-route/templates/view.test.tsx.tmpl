@@ -1,0 +1,28 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { {{Name}}View } from './{{name}}-view';
+
+describe('{{Name}}View', () => {
+  it('shows the title as the screen heading in every state', () => {
+    render(<{{Name}}View title="Title" state={{ status: 'loading' }} onRetry={vi.fn()} />);
+    expect(screen.getByRole('heading', { name: 'Title' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  });
+
+  it('shows the data when ready', () => {
+    render(
+      <{{Name}}View title="Title" state={{ status: 'ready', data: { summary: 'Hello' } }} onRetry={vi.fn()} />,
+    );
+    expect(screen.getByText('Hello')).toBeInTheDocument();
+  });
+
+  it('shows the error and retries on request', async () => {
+    const onRetry = vi.fn();
+    render(<{{Name}}View title="Title" state={{ status: 'error', message: 'Offline' }} onRetry={onRetry} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Offline');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+});

@@ -1,0 +1,38 @@
+import { useCallback, useEffect, useState } from 'react';
+import { load{{Name}} } from '../api/{{name}}-api';
+import type { {{Name}}Data } from '../model/{{name}}';
+
+export type {{Name}}State =
+  | { status: 'loading' }
+  | { status: 'ready'; data: {{Name}}Data }
+  | { status: 'error'; message: string };
+
+export function use{{Name}}(load: () => Promise<{{Name}}Data> = load{{Name}}) {
+  const [state, setState] = useState<{{Name}}State>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    // Ignore results that arrive after unmount or after a newer attempt started.
+    let current = true;
+    load().then(
+      (data) => {
+        if (current) setState({ status: 'ready', data });
+      },
+      (error: unknown) => {
+        if (current) {
+          setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
+        }
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [load, attempt]);
+
+  const reload = useCallback(() => {
+    setState({ status: 'loading' });
+    setAttempt((previous) => previous + 1);
+  }, []);
+
+  return { state, reload };
+}

@@ -50,7 +50,7 @@ export default tseslint.config(
     rules: { 'no-restricted-syntax': 'off' },
   },
   {
-    files: ['scripts/**/*.mjs', 'eslint.config.js'],
+    files: ['scripts/**/*.mjs', '.claude/skills/**/*.mjs', 'eslint.config.js'],
     languageOptions: { globals: globals.node },
   },
   prettier,

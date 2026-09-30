@@ -1,0 +1,8 @@
+import { use{{Name}} } from '../hooks/use-{{name}}';
+import { {{CONST}}_TITLE } from '../model/{{name}}';
+import { {{Name}}View } from './{{name}}-view';
+
+export function {{Name}}Screen() {
+  const { state, reload } = use{{Name}}();
+  return <{{Name}}View title={{{CONST}}_TITLE} state={state} onRetry={reload} />;
+}

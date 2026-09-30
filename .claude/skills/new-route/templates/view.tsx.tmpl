@@ -1,0 +1,25 @@
+import type { {{Name}}State } from '../hooks/use-{{name}}';
+
+interface {{Name}}ViewProps {
+  title: string;
+  state: {{Name}}State;
+  onRetry: () => void;
+}
+
+export function {{Name}}View({ title, state, onRetry }: {{Name}}ViewProps) {
+  return (
+    <section className="screen" aria-labelledby="{{name}}-title">
+      <h2 id="{{name}}-title">{title}</h2>
+      {state.status === 'loading' && <p role="status">Loading…</p>}
+      {state.status === 'error' && (
+        <div role="alert">
+          <p>Couldn&apos;t load this screen: {state.message}</p>
+          <button type="button" className="button" onClick={onRetry}>
+            Try again
+          </button>
+        </div>
+      )}
+      {state.status === 'ready' && <p>{state.data.summary}</p>}
+    </section>
+  );
+}

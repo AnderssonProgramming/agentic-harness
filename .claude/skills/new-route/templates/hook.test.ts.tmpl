@@ -1,0 +1,33 @@
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { {{CONST}}_PLACEHOLDER } from '../model/{{name}}';
+import { use{{Name}} } from './use-{{name}}';
+
+describe('use{{Name}}', () => {
+  it('starts loading, then shows the data from the integration point', async () => {
+    const { result } = renderHook(() => use{{Name}}());
+    expect(result.current.state.status).toBe('loading');
+    await waitFor(() => {
+      expect(result.current.state).toEqual({ status: 'ready', data: {{CONST}}_PLACEHOLDER });
+    });
+  });
+
+  it('reports a failed load and recovers on reload', async () => {
+    let fail = true;
+    const load = () =>
+      fail ? Promise.reject(new Error('Service unavailable')) : Promise.resolve({{CONST}}_PLACEHOLDER);
+    const { result } = renderHook(() => use{{Name}}(load));
+
+    await waitFor(() => {
+      expect(result.current.state).toEqual({ status: 'error', message: 'Service unavailable' });
+    });
+
+    fail = false;
+    act(() => {
+      result.current.reload();
+    });
+    await waitFor(() => {
+      expect(result.current.state.status).toBe('ready');
+    });
+  });
+});

@@ -1,0 +1,6 @@
+import { {{CONST}}_PLACEHOLDER, type {{Name}}Data } from '../model/{{name}}';
+
+// Integration point (ADR-07): returns placeholder data until a backlog item connects a real service.
+export function load{{Name}}(): Promise<{{Name}}Data> {
+  return Promise.resolve({{CONST}}_PLACEHOLDER);
+}
