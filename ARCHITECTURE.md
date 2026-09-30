@@ -12,19 +12,23 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
 ├── BACKLOG.md              # prioritized product backlog
 ├── ARCHITECTURE.md         # this file
 ├── .claude/settings.json   # enforced context exclusions and permissions
+├── .claude/skills/         # Custom Skills (one folder per skill, SKILL.md inside)
 ├── docs/                   # contract tests and other evidence
 ├── scripts/                # Node scripts run by npm (no build step)
 ├── index.html              # Vite entry HTML
 └── src/
     ├── main.tsx            # mounts <App /> into #root, nothing else
-    ├── app/                # app shell: root component and global styles
+    ├── app/                # app shell: layout, navigation, global styles
+    │   ├── routes.ts       # the route table (ADR-06); new-route skill appends here
+    │   └── hooks/          # use-route: current path and navigate()
     ├── features/
     │   └── chat/           # everything for the chat screen (B-01, B-02)
     │       ├── index.ts    # public surface of the feature: exports ChatScreen only
     │       ├── chat.css    # styles for this feature only
     │       ├── components/ # chat-screen (composition), message-list, composer
     │       ├── hooks/      # use-chat (messages), use-auto-scroll
-    │       └── model/      # message.ts: types and pure functions (no React)
+    │       ├── model/      # message.ts: types and pure functions (no React)
+    │       └── api/        # integration point with external services (ADR-07), when needed
     └── shared/             # code used by two or more features
 ```
 
@@ -81,6 +85,26 @@ Decision: every accepted user message is followed by a fixed assistant message (
 Reason: B-01 requires user and assistant messages to be visually distinct, which can't be verified without assistant messages. Sprint 1 forbids any model call. A fixed, honest reply satisfies both, and B-03 replaces it at a single point (`appendExchange`).
 
 Rejected alternative: echoing the user's text back, or scripted fake answers. Rejected because both look like the assistant is answering, which would mislead a user and hide that the product doesn't think yet.
+
+## [ADR-06] A route table and a History API hook instead of a router library
+
+Date: 2026-09-30
+
+Decision: routes are a typed array in `src/app/routes.ts` (`path`, `title`, `component`). A `useRoute` hook reads `location.pathname` through `useSyncExternalStore` and exposes `navigate(path)`, which calls `history.pushState`. `App` renders the matching component, builds the navigation from the same table, and shows a not-found view otherwise. Paths are exact matches; there are no nested or dynamic routes.
+
+Reason: Compass has a handful of flat screens. Forty lines we fully understand beat a library whose data loaders and framework mode overlap with ADR-02. It also gives the `new-route` skill one predictable place to edit: one import and one entry in one file.
+
+Rejected alternative: `react-router`. Rejected for now because it would be a new dependency and more API surface for the agent to misuse, and we need none of its features yet. We'll revisit if we need route parameters (e.g. `/docs/:id`) or nested layouts.
+
+## [ADR-07] Each feature talks to the outside world through its own `api/` folder
+
+Date: 2026-09-30
+
+Decision: a feature that needs data from outside the browser gets `src/features/<feature>/api/<feature>-api.ts`, which exports async functions returning typed data (`loadKnowledge(): Promise<KnowledgeData>`). Hooks call these functions; components never do. Until a backlog item connects a real service, the function returns local placeholder data.
+
+Reason: it's the integration point the Web track asks for. Loading and error states can be built and tested now, and when Skill 2 connects the model, only the body of the `api/` function changes. The hook, the view and their tests stay the same.
+
+Rejected alternative: calling `fetch` inside hooks. Rejected because the hook would then mix React state with transport details (URLs, headers, parsing), and every test of the hook would need to mock the network.
 
 ## Inference engine
 
