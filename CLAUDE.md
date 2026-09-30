@@ -77,6 +77,16 @@ When you need to know a library's API or types, do not try to open `node_modules
 8. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
 9. Update the item's `Status:` in BACKLOG.md when it changes.
 
+## Available skills
+
+Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill, use the skill instead of doing the work by hand, and follow its steps exactly. If a skill's steps don't fit the request, say so rather than improvising around them.
+
+A listed skill's `SKILL.md` is a plan I have already approved. When I ask for a skill, you don't write a new plan for its steps. That approval covers **how**, never **what**: the work must still trace to a backlog item, and must not contradict an ADR. If it doesn't, stop and ask, as in any other task.
+
+- None yet. `new-route` is in its reliability test.
+
+A skill is only listed here after it has passed the reliability test: three runs in a row, in fresh sessions, with no manual touch-ups (evidence in `docs/evidence/`).
+
 ## Commands
 
 - `npm install` — install dependencies.
@@ -85,3 +95,5 @@ When you need to know a library's API or types, do not try to open `node_modules
 - `npm test` — run the unit and component tests once.
 - `npm run format` — apply Prettier.
 - `npm run engine:check` — verify the active inference engine answers.
+- `npm run verify:chat` — check the B-01/B-02 criteria in headless Chrome (starts its own server).
+- `npm run verify:route -- <path-without-leading-slash> "<title>"` — check that a route loads in headless Chrome.
