@@ -1,0 +1,18 @@
+import { useAutoScroll } from '../hooks/use-auto-scroll';
+import { useChat } from '../hooks/use-chat';
+import { Composer } from './composer';
+import { MessageList } from './message-list';
+
+export function ChatScreen() {
+  const { messages, send } = useChat();
+  const scrollRef = useAutoScroll<HTMLDivElement>(messages.length);
+
+  return (
+    <section className="chat" aria-label="Chat with Compass">
+      <div className="chat__scroll" ref={scrollRef}>
+        <MessageList messages={messages} />
+      </div>
+      <Composer onSend={send} />
+    </section>
+  );
+}
