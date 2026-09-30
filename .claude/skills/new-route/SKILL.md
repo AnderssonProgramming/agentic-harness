@@ -31,6 +31,8 @@ Stop and ask, don't guess, when:
 
 ## Steps
 
+Run every command from the repository root exactly as written: one command per call, no `cd … &&` prefix and no chaining. Chained commands need separate approval, and the pre-approved commands (in `.claude/settings.json`) only match the plain form.
+
 1. Read `src/app/routes.ts`. If `path` is already registered or `src/features/<name>/` exists, stop and report which one. Never overwrite.
 2. Run the generator with exactly these flags (quote `title` and `purpose`):
    ```bash
@@ -71,9 +73,11 @@ Stop and ask, don't guess, when:
 
 ## Known errors
 
-| Symptom                                                                 | Cause                                                                                                            | What to do                                                                                   |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `looks like a path converted by Git Bash`                               | On Windows, Git Bash rewrites arguments that start with `/` into Windows paths (`/x` → `C:/Program Files/Git/x`) | Pass the path without the leading slash. Both scripts add it back.                           |
-| `The path /x is already registered` or `src/features/x/ already exists` | The screen exists                                                                                                | Stop. Ask whether to pick another name or change the existing screen (not this skill's job). |
-| `The marker comments in src/app/routes.ts are missing`                  | Someone edited `routes.ts` and removed `// new-route: …` lines                                                   | Restore both marker comments (see ADR-06) in a separate commit, then rerun.                  |
-| `verify:route` fails with `Chrome did not start`                        | Chrome isn't at the default Windows path                                                                         | Set `CHROME_PATH` to the Chrome executable and rerun step 5.                                 |
+| Symptom                                                                                | Cause                                                                                                            | What to do                                                                                                                              |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `looks like a path converted by Git Bash`                                              | On Windows, Git Bash rewrites arguments that start with `/` into Windows paths (`/x` → `C:/Program Files/Git/x`) | Pass the path without the leading slash. Both scripts add it back.                                                                      |
+| `The path /x is already registered` or `src/features/x/ already exists`                | The screen exists                                                                                                | Stop. Ask whether to pick another name or change the existing screen (not this skill's job).                                            |
+| `The marker comments in src/app/routes.ts are missing`                                 | Someone edited `routes.ts` and removed `// new-route: …` lines                                                   | Restore both marker comments (see ADR-06) in a separate commit, then rerun.                                                             |
+| `verify:route` fails with `Chrome did not start`                                       | Chrome isn't at the default Windows path                                                                         | Set `CHROME_PATH` to the Chrome executable and rerun step 5.                                                                            |
+| A command returns `This command requires approval` in a headless (`claude -p`) session | The command isn't in the `allow` list of `.claude/settings.json`, or it was chained (`cd … && …`)                | Run it in the plain form from the repository root. If it's genuinely new, ask the PO to add it to the allow list; never work around it. |
+| The request arrives as `C:/Program Files/Git/new-route …`                              | `claude -p "/new-route …"` typed in Git Bash: the shell rewrote the slash command before Claude saw it           | Treat it as `/new-route …`. To avoid it, run `MSYS_NO_PATHCONV=1 claude -p "/new-route …"` or type the command inside Claude.           |
