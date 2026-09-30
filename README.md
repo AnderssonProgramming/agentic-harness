@@ -39,17 +39,18 @@ Open http://localhost:5173 and type a message. That's all the app needs in Sprin
 
 ## How the harness is organized
 
-| File                                                 | Purpose                                                              |
-| ---------------------------------------------------- | -------------------------------------------------------------------- |
-| [`CLAUDE.md`](CLAUDE.md)                             | Master context: the agent's role, rules and prohibitions             |
-| [`.claude/settings.json`](.claude/settings.json)     | Enforced context exclusions and permissions                          |
-| [`BACKLOG.md`](BACKLOG.md)                           | Prioritized product backlog with acceptance criteria                 |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md)                 | Folder map, architecture decisions (ADR-01 to ADR-05), engine switch |
-| [`docs/plans/`](docs/plans)                          | Step-by-step plans approved by the Product Owner before any code     |
-| [`docs/evidence/`](docs/evidence)                    | Verification results, screenshots and contract-test transcripts      |
-| [`docs/contract-tests.md`](docs/contract-tests.md)   | Seven deliberate rule violations and how the agent stopped each one  |
-| [`docs/sprint-1-review.md`](docs/sprint-1-review.md) | Three-minute demo script for the Sprint Review                       |
-| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)   | Harness retrospective and the rules it added                         |
+| File                                                   | Purpose                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------- |
+| [`CLAUDE.md`](CLAUDE.md)                               | Master context: the agent's role, rules and prohibitions             |
+| [`.claude/settings.json`](.claude/settings.json)       | Enforced context exclusions and permissions                          |
+| [`BACKLOG.md`](BACKLOG.md)                             | Prioritized product backlog with acceptance criteria                 |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md)                   | Folder map, architecture decisions (ADR-01 to ADR-05), engine switch |
+| [`docs/plans/`](docs/plans)                            | Step-by-step plans approved by the Product Owner before any code     |
+| [`docs/evidence/`](docs/evidence)                      | Verification results, screenshots and contract-test transcripts      |
+| [`docs/contract-tests.md`](docs/contract-tests.md)     | Seven deliberate rule violations and how the agent stopped each one  |
+| [`docs/sprint-1-review.md`](docs/sprint-1-review.md)   | Three-minute demo script for the Sprint Review                       |
+| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)     | Harness retrospective and the rules it added                         |
+| [`docs/code-walkthrough.md`](docs/code-walkthrough.md) | Line-by-line explanation of the chat feature                         |
 
 Source layout (feature-based, see ADR-01):
 
