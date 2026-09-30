@@ -10,7 +10,29 @@ Method for every run:
 
 Nothing was edited by hand in any clone. Screenshots below are from the independent verification.
 
-## Passing series (series 3): skill at commit `19308ac`
+## Current passing series (series 4): skill at commit `824ea24`
+
+| Run 1                              | Run 2                              | Run 3                              |
+| ---------------------------------- | ---------------------------------- | ---------------------------------- |
+| ![Run 1](skill-new-route-run1.png) | ![Run 2](skill-new-route-run2.png) | ![Run 3](skill-new-route-run3.png) |
+
+Between series 3 and 4, a confirmation run in the **main repository folder** (trusted, no extra flags) refused a request "for B-06" that the clone sessions had accepted, because B-06's criteria don't describe a screen. The scope check was a judgment call, so `824ea24` made it mechanical: a named item ID that exists and isn't done is enough, and a mismatch is reported without stopping. Changing the skill restarted the test.
+
+| Run | Condition                            | Invocation                                                                           | Agent time | Result                                                                                             |
+| --- | ------------------------------------ | ------------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------- |
+| 1   | Slash command, defaults              | `/new-route knowledge (for B-06)`                                                    | 131 s      | ✅ `/knowledge`: check pass, verify 6/6, only generator files                                      |
+| 2   | Slash command, custom path and title | `/new-route team-conventions conventions "Team conventions" (for B-06)`              | 140 s      | ✅ `/conventions`: check pass, verify 6/6                                                          |
+| 3   | Natural language                     | "Add a screen for B-06 where new hires will browse the team's onboarding documents." | 132 s      | ✅ derived `/documents` "Documents": check pass, verify 6/6                                        |
+| –   | Negative: existing screen            | `/new-route chat /`                                                                  | 13 s       | Stopped, nothing changed                                                                           |
+| –   | Negative: no backlog item named      | `/new-route knowledge`                                                               | 17 s       | Stopped, quoted the rule, pointed at B-06 as the nearest item without assuming it. Nothing changed |
+
+No permission denials or tool errors in any run. Cost: USD 0.21–0.36 per run.
+
+**Trusted-folder confirmation (closes last week's open item):** in the main repository with **no** `--allowedTools` flag, the natural-language request launched the skill through `Skill(new-route)`, ran all five commands with zero permission denials, passed check and verify, and reported the B-06 mismatch without stopping. The generated files were removed afterwards, because no backlog item puts that screen on `main`.
+
+**Open observation:** from the same sentence, series 3 derived `onboarding-documents` and series 4 derived `documents`. Both are valid and both are reported to the PO as derived inputs, but the "main noun" rule still leaves room for interpretation. Candidate hardening for Sprint 3: "use the full noun phrase, modifiers included".
+
+## Earlier passing series (series 3): skill at commit `19308ac`
 
 | Run | Condition                                             | Invocation                                                                           | Agent time | Result                                                                                      |
 | --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
@@ -21,10 +43,6 @@ Nothing was edited by hand in any clone. Screenshots below are from the independ
 All three ran the same 5 skill commands in the same order: generator → `format` → `check` → `verify:route` → `git status`. Cost per run: USD 0.33 / 0.38 / 0.48.
 
 Note on run 3: before launching the skill, the agent tried to explore the repository with a chained `cd … && cat …`. The deny rules blocked it, and it continued with plain reads. It wasn't a skill step and needed no human action, but it shows why the skill says "plain commands only".
-
-| Run 1                              | Run 2                              | Run 3                              |
-| ---------------------------------- | ---------------------------------- | ---------------------------------- |
-| ![Run 1](skill-new-route-run1.png) | ![Run 2](skill-new-route-run2.png) | ![Run 3](skill-new-route-run3.png) |
 
 ### Negative run (same skill commit)
 
@@ -70,4 +88,5 @@ The skill was right and the test prompts were missing a named backlog item. Seri
 ## What this proves, and what it doesn't
 
 - **Proven:** the same command produces the same eight files, the same route registration and passing checks across three conditions, in fresh sessions, with no human in the loop. Across all series it also refuses to act on conflicts, missing scope and existing screens.
-- **Not proven:** interactive use in a trusted folder was not part of this test. There, the project allow rules should apply and `--allowedTools` shouldn't be needed. Confirm it the first time the skill is used interactively.
+- **Confirmed since:** in the trusted main folder the project allow rules apply, and no `--allowedTools` flag is needed (series 4 section).
+- **Not proven:** that derived names are stable across sessions (see the open observation).
