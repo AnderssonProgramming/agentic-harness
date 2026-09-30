@@ -32,6 +32,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 
 - Runtime: `react`, `react-dom`.
 - Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `@types/react`, `@types/react-dom`, `@types/node`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `@eslint-community/eslint-plugin-eslint-comments`, `eslint-config-prettier`, `globals`, `prettier`.
+- Test (dev, approved 2026-09-30 with the B-01 plan): `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`.
 
 ## Code standards
 
@@ -74,6 +75,7 @@ These paths are also denied in `.claude/settings.json`; that file is the enforce
 
 - `npm install` — install dependencies.
 - `npm run dev` — start the app at http://localhost:5173.
-- `npm run check` — typecheck, lint and format check (must pass before any commit).
+- `npm run check` — typecheck, lint, format check and tests (must pass before any commit).
+- `npm test` — run the unit and component tests once.
 - `npm run format` — apply Prettier.
 - `npm run engine:check` — verify the active inference engine answers.
