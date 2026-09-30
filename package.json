@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
     "engine:check": "node --env-file-if-exists=.env scripts/check-engine.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:chat": "node scripts/verify-chat.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",
