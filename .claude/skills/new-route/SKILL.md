@@ -24,13 +24,16 @@ With `/new-route`, arguments come in that order: `/new-route team-conventions co
 
 When the request is in words, derive `name` from the main noun: "a screen for team conventions" → `team-conventions`; "a settings page" → `settings`. Take `purpose` from the user's description of what the screen is for, keeping their words. **State the derived inputs in your report.**
 
-Scope comes from the backlog, not from this skill (see "Available skills" in CLAUDE.md). The screen must trace to a backlog item: one the user names, or one whose story clearly describes this screen.
+Scope comes from the backlog, and the PO decides it (see "Available skills" in CLAUDE.md). The check is mechanical, not a judgment call:
+
+- **The request names a backlog item ID** (`B-06`) **that exists in BACKLOG.md and isn't `done`**: proceed. If that item's criteria don't mention a screen, say so in the report, but don't stop. Tying a screen to an item is the PO's call.
+- **No ID is named, or the ID doesn't exist or is `done`**: stop.
 
 Stop and ask, don't guess, when:
 
 - there is no noun you can turn into a name ("add a new page"),
 - the user's words suggest changing an existing screen rather than adding one,
-- no backlog item covers the screen. Offer a draft item, but don't write it, or
+- the request names no backlog item ID, or the ID doesn't exist or is `done`. Offer a draft item, but don't write it, or
 - the screen would contradict an ADR or a backlog criterion. For example, a UI to pick the inference engine contradicts ADR-03 and B-04, which say the engine is chosen by environment variable.
 
 ## Steps
