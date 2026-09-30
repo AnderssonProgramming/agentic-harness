@@ -1,0 +1,74 @@
+SKILL 1 DESIGN: new-route (plain text, day 2)
+
+1. NAME AND DESCRIPTION
+new-route. Adds one new screen to Compass: a route in the route table, a
+feature folder with a typed view, a state hook and an API integration point
+that returns local placeholder data. Use it when someone asks for a new
+screen, page, route or section of the app. Do NOT use it to change an
+existing screen, to add a component inside an existing screen, or to connect
+a real API (that is Skill 2).
+
+2. TRIGGER
+Either the slash command:
+  /new-route <name> [path] [title]
+or a request in words, such as "add a settings screen", "create a page for the
+knowledge base" or "I need a new route for X".
+
+3. INPUTS
+- name: kebab-case, 2 to 30 characters, starts with a letter
+  (e.g. knowledge, team-conventions). Required. If the request only describes
+  the screen, derive the name from the main noun ("a screen for team
+  conventions" -> team-conventions) and state the derived name in the report.
+- path: URL path. Optional, default "/<name>".
+- title: shown in the navigation and as the page heading. Optional, default
+  is the name in Title Case (team-conventions -> Team Conventions).
+- purpose: one sentence shown under the heading. Optional. The default says
+  which backlog item will fill the screen, if one is named, or "Coming soon."
+If name can't be derived, or the name or path already exist, stop and ask.
+Never overwrite.
+
+4. STEPS
+1. Read ARCHITECTURE.md (ADR-01, ADR-06, ADR-07) and src/app/routes.ts.
+2. Check that the path is not already in src/app/routes.ts and that
+   src/features/<name>/ does not exist. If either exists: stop and report.
+3. Run the generator:
+   node .claude/skills/new-route/scaffold.mjs --name <name> --path <path>
+        --title "<title>" --purpose "<purpose>"
+   It creates the feature folder from templates and registers the route.
+   It exits with an error and changes nothing if an input is invalid or
+   something already exists.
+4. Run npm run format.
+5. Run npm run check (typecheck, lint, format, tests). If it fails, show the
+   full output, fix only files created in step 3, and rerun. At most 2 fix
+   attempts, then stop and report.
+6. Run npm run verify:route -- <path> "<title>". It starts its own dev
+   server and headless Chrome, opens the path, and checks the heading, the
+   active navigation link and that there are no console errors.
+7. Report: the files created, the check results, and the verify output.
+   Do not commit. The contract says the diff summary goes to the PO first.
+
+5. OUTPUT
+New files:
+  src/features/<name>/index.ts               exports <Name>Screen only
+  src/features/<name>/model/<name>.ts        <Name>Data type, placeholder
+  src/features/<name>/api/<name>-api.ts      load<Name>(): Promise<Data>
+  src/features/<name>/hooks/use-<name>.ts    status: loading | ready | error
+  src/features/<name>/components/<name>-screen.tsx   calls the hook
+  src/features/<name>/components/<name>-view.tsx     props only
+  plus a test file next to the hook and the view
+Modified: src/app/routes.ts (one import, one route entry).
+Nothing committed.
+
+6. VERIFICATION
+- npm run check exits 0 (the types compile, lint is clean, the generated
+  tests pass).
+- npm run verify:route -- <path> "<title>" exits 0 (the route loads in the
+  browser, the heading matches the title, the nav link for it is marked as
+  current, and there are no console errors).
+- git status shows only the files listed in OUTPUT.
+
+SMOKE TEST OF THE DESIGN
+Could someone follow this without asking me anything? The only judgment call
+is deriving the name from a sentence, and the rule for it is written down in
+INPUTS, along with the report that states the result. Everything else is a
+command with a defined result.
