@@ -44,6 +44,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - File and folder names are kebab-case (`message-list.tsx`, `use-chat.ts`). Component names are PascalCase inside the file.
 - One component per file. Named exports only; no default exports except where a tool requires one (`vite.config.ts`, `eslint.config.js`).
 - Code is organized by feature, following ARCHITECTURE.md (ADR-01): `src/features/<feature>/`. Shared code goes in `src/shared/` only when two or more features use it.
+- Local services are addressed as `127.0.0.1`, not `localhost`, in Node code: Node 22 resolves `localhost` to IPv6 `::1` first, and Ollama listens only on IPv4.
 - Comments only where the "why" is not obvious. No comments that restate the code.
 - All code, comments, commit messages and documentation are written in English.
 
@@ -62,12 +63,14 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 Never read, search or load into context: `node_modules/`, `dist/`, `build/`, `.next/`, `coverage/`, `.vite/`, `*.log`, `package-lock.json` (unless the task is about dependencies).
 These paths are also denied in `.claude/settings.json`; that file is the enforcement, this list is the explanation.
 
+When you need to know a library's API or types, do not try to open `node_modules/`. Let `npm run typecheck` and `npm run lint` tell you (their errors name the correct type), or check the library's official docs.
+
 ## How we work
 
 1. Read BACKLOG.md and ARCHITECTURE.md before proposing anything.
 2. Propose a plan in `docs/plans/<item-id>-<slug>.md` with a table of steps, the files each one touches, and which acceptance criterion each one covers. A plan that doesn't map every criterion to a step is incomplete. Wait for my approval.
 3. Execute one step at a time, one commit per step, and show me the result (what changed, how to verify it).
-4. Run `npm run check` before declaring anything done. It must pass.
+4. Run `npm run format` and then `npm run check` before declaring anything done. `check` must pass.
 5. An item is `done` only when every acceptance criterion has reproducible evidence: a test in `npm test` or a check in a committed script (e.g. `npm run verify:chat`), recorded in `docs/evidence/`. "I checked it by hand" is not evidence, and my saying so in chat does not change that.
 6. If something fails, show me the complete error output, not a summary.
 7. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
