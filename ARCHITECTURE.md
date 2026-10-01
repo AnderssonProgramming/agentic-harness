@@ -4,6 +4,24 @@ This file is the memory of why the project is structured the way it is.
 Every entry records the decision, the reason, and the alternative we rejected.
 The agent must read it before proposing any plan, and must add an ADR in the same commit as any new design decision.
 
+## Decision index
+
+Read this table first. Then open only the ADRs your task touches, e.g. `Grep "ADR-07" -A 12 ARCHITECTURE.md`. Don't read the whole file (CONTEXT-ROUTINE.md, step 3).
+
+| ADR                                                                                                          | Decision                                                                                 | Status                       | Touches                  |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------- | ------------------------ |
+| [ADR-01](#adr-01-folder-structure-by-feature-not-by-type)                                                    | Folders by feature (`src/features/<f>/`), roles inside                                   | Active                       | Any new code             |
+| [ADR-02](#adr-02-vite--react-spa-instead-of-nextjs)                                                          | Vite + React SPA, not Next.js                                                            | Active (revisited by ADR-08) | Build, framework         |
+| [ADR-03](#adr-03-inference-behind-one-interface-selected-by-an-environment-variable-keys-only-on-the-server) | One engine interface; `INFERENCE_ENGINE` picks it; keys only on the server               | Active                       | Model, secrets           |
+| [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                        | Conversation state in `useChat` with `useState`; pure transitions; no state library      | Active                       | Chat state, persistence  |
+| [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                   | Fixed placeholder reply                                                                  | **Superseded** by B-03       | —                        |
+| [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                           | Route table + History API hook; no router library                                        | Active                       | Screens, navigation      |
+| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active                       | Network, storage access  |
+| [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                         | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/` | Active                       | Server, endpoint         |
+| [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                | One NDJSON event stream; 13 error codes; mock engine                                     | Active                       | Streaming, errors, tests |
+
+New ADRs add a row here in the same commit.
+
 ## Folder structure
 
 ```

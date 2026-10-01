@@ -68,7 +68,7 @@ When you need to know a library's API or types, do not try to open `node_modules
 
 ## How we work
 
-1. Read BACKLOG.md and ARCHITECTURE.md before proposing anything.
+1. Before proposing anything, read the backlog item you are working on and ARCHITECTURE.md's _Decision index_, then the ADRs it points you to. Read narrowly (CONTEXT-ROUTINE.md, step 3): never a whole document "to understand", and never several files in one chained command.
 2. Propose a plan in `docs/plans/<item-id>-<slug>.md` with a table of steps, the files each one touches, and which acceptance criterion each one covers. A plan that doesn't map every criterion to a step is incomplete. Wait for my approval.
 3. Execute one step at a time, one commit per step, and show me the result (what changed, how to verify it).
 4. Run `npm run format` and then `npm run check` before declaring anything done. `check` must pass.
@@ -78,6 +78,19 @@ When you need to know a library's API or types, do not try to open `node_modules
 8. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
 9. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
 10. Update the item's `Status:` in BACKLOG.md when it changes.
+
+## Context control
+
+Follow CONTEXT-ROUTINE.md. The parts that are yours:
+
+- One session, one task.
+- Read narrowly.
+- Run noisy commands in the background or quietly (`npm run -s`).
+- Read the full output of a failing command, not of the passing ones.
+- Commit each step before the next.
+- Take numbers and results from the source, never from memory.
+
+When you notice one of its signals in yourself, say so in your next reply. The signals are: repeating a corrected error, proposing something an ADR rejected, contradicting this file, or misremembering a file or a count.
 
 ## Self-correction loop
 
