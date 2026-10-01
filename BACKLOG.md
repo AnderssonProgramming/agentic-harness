@@ -100,15 +100,20 @@ Status: pending
 
 ## Priority 3
 
-### [B-08] Conversation survives a reload
+### [B-08] Conversation survives closing the app
 
-As a junior developer I want my conversation to still be there after reloading the page, so I can continue where I left off.
+As a junior developer I want my conversation to still be there when I come back to Compass, even after closing the browser, so I can continue where I left off without repeating myself.
 
 Acceptance criteria:
 
-- The conversation is saved to `localStorage` after each message.
-- Reloading the page restores all messages in order.
-- A "New conversation" button clears the history after a confirmation.
+- **Automatic:** the conversation is saved after every change (a sent message, and a reply that finishes, stops or fails), with no user action.
+- **Survives a real close:** after closing the browser completely and opening the app again, the previous conversation is there. This is verified by restarting the browser with the same profile, not only by a reload.
+- **Order and state:** messages come back in their original order, with their author, text and status. A reply that was still streaming when the app closed comes back as `stopped` with its partial text, never stuck as `streaming`.
+- **Clear history:** a "New conversation" action clears the conversation on screen and in storage after an explicit confirmation. Cancelling keeps everything.
+- **Storage failure:** if storage is unavailable or full (blocked by the browser, quota exceeded), the chat keeps working in memory and shows a visible notice that the conversation won't be saved.
+- **Bad data:** stored data that is corrupted, or saved in an older format, doesn't break the app. It's migrated if the format is known; otherwise the app starts with an empty conversation and says so once.
+- **Boundaries:** storage is reached only through the chat feature's `api/` layer (ADR-07); components never touch `localStorage`.
+- **Evidence:** unit tests for saving, restoring and migrating, plus a browser check that restarts the browser and that simulates blocked storage.
 
 Status: pending
 
