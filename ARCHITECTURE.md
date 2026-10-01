@@ -8,18 +8,19 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
 
 Read this table first. Then open only the ADRs your task touches, e.g. `Grep "ADR-07" -A 12 ARCHITECTURE.md`. Don't read the whole file (CONTEXT-ROUTINE.md, step 3).
 
-| ADR                                                                                                          | Decision                                                                                 | Status                       | Touches                  |
-| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------- | ------------------------ |
-| [ADR-01](#adr-01-folder-structure-by-feature-not-by-type)                                                    | Folders by feature (`src/features/<f>/`), roles inside                                   | Active                       | Any new code             |
-| [ADR-02](#adr-02-vite--react-spa-instead-of-nextjs)                                                          | Vite + React SPA, not Next.js                                                            | Active (revisited by ADR-08) | Build, framework         |
-| [ADR-03](#adr-03-inference-behind-one-interface-selected-by-an-environment-variable-keys-only-on-the-server) | One engine interface; `INFERENCE_ENGINE` picks it; keys only on the server               | Active                       | Model, secrets           |
-| [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                        | Conversation state in `useChat` with `useState`; pure transitions; no state library      | Active                       | Chat state, persistence  |
-| [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                   | Fixed placeholder reply                                                                  | **Superseded** by B-03       | —                        |
-| [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                           | Route table + History API hook; no router library                                        | Active                       | Screens, navigation      |
-| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active (refined by ADR-10)   | Network, storage access  |
-| [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                         | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/` | Active                       | Server, endpoint         |
-| [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                | One NDJSON event stream; 13 error codes; mock engine                                     | Active                       | Streaming, errors, tests |
-| [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                               | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard               | Active                       | Persistence, storage     |
+| ADR                                                                                                          | Decision                                                                                 | Status                                       | Touches                  |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
+| [ADR-01](#adr-01-folder-structure-by-feature-not-by-type)                                                    | Folders by feature (`src/features/<f>/`), roles inside                                   | Active                                       | Any new code             |
+| [ADR-02](#adr-02-vite--react-spa-instead-of-nextjs)                                                          | Vite + React SPA, not Next.js                                                            | Active (revisited by ADR-08)                 | Build, framework         |
+| [ADR-03](#adr-03-inference-behind-one-interface-selected-by-an-environment-variable-keys-only-on-the-server) | One engine interface; `INFERENCE_ENGINE` picks it; keys only on the server               | Active                                       | Model, secrets           |
+| [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                        | Conversation state in `useChat` with `useState`; pure transitions; no state library      | Active                                       | Chat state, persistence  |
+| [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                   | Fixed placeholder reply                                                                  | **Superseded** by B-03                       | —                        |
+| [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                           | Route table + History API hook; no router library                                        | Active                                       | Screens, navigation      |
+| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active (refined by ADR-10)                   | Network, storage access  |
+| [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                         | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/` | Active                                       | Server, endpoint         |
+| [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                | One NDJSON event stream; 13 error codes; mock engine                                     | Active                                       | Streaming, errors, tests |
+| [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                               | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard               | Active                                       | Persistence, storage     |
+| [ADR-11](#adr-11-the-model-requests-to-do-actions-the-browser-runs-them-and-confirms)                        | The model requests to-do actions (`action` event); the browser runs them and confirms    | **Proposed by the agent, pending PO review** | To-dos, protocol, tools  |
 
 New ADRs add a row here in the same commit.
 
@@ -166,6 +167,25 @@ Rejected alternatives:
 - An async store, as ADR-07 describes: rejected because it wraps a synchronous API in a `Promise` only to add a loading state and a flash of the empty chat on every start.
 - IndexedDB: rejected because it's async, needs far more code, and a text conversation is well within `localStorage`'s quota. A full quota is handled anyway.
 - A real "version 0" format to migrate from: rejected because no older data exists. The migration path is proven by a test with a fixture migration instead.
+
+## [ADR-11] The model requests to-do actions, the browser runs them and confirms
+
+Date: 2026-10-01. Status: **Proposed by the agent, pending PO review** (B-11 delegation contract, Decisions 1–5).
+
+Decision:
+
+- **Wire (ADR-09 gains one event).** The stream may carry `{ type: 'action', action }`, where `action` is a `TodoAction`: `add` (`text`), `list`, or `complete` (`id` or `null`, plus a `query` describing it). The request may carry `todos: { id, text }[]`, the user's open to-dos. Engines yield text or actions; the handler forwards both.
+- **Engines.** Anthropic declares three tools (`add_todo`, `list_todos`, `complete_todo`) with parallel tool use off, gets the open to-dos in its system prompt, and turns the first `tool_use` block into an action. The mock emits the same action from "remind me to …", "add … to my list", "what's on my list" and "mark … as done". Ollama declares no tools. The shared system prompt tells every model that only the app changes or confirms the list.
+- **Execution.** `src/features/todos/` owns the list: a versioned snapshot under `compass.todos` and a synchronous store that never throws (the ADR-10 pattern). `useChat` runs the action only after the stream ends with `done`, through the to-do feature's `index.ts`. The executor loads, changes and saves, then **reads the list back** and builds the card from what's stored. A storage failure gives a failure card and changes nothing. "Complete" matches only open to-dos: by id if the model gave a valid one, otherwise by the query's words. None or several matches change nothing and ask which one.
+- **Cards.** The reply's `action` field moves from `pending` (set when the event arrives) to `settled` with the card. When an action arrives, the reply's streamed text is dropped, so model text can never stand beside, or replace, the app's confirmation. A failed or stopped stream drops a pending action without running it. The conversation snapshot moves to version 2 (migration 1 → 2 adds `action: null`). The model gets each card back as a one-line text summary in the history, so the next turn has context.
+
+Reason: the app, not the model, is the source of truth for the list. Only data read back from storage can produce "Added" or "Marked as done", which makes a false confirmation structurally impossible, whatever the engine says. Running in the browser keeps the list where ADR-10 keeps the conversation, with no server storage to add.
+
+Rejected alternatives:
+
+- Executing on the server and sending the result back to the model as a `tool_result`: rejected because the data lives in the browser, and the model's follow-up text would become a second, unverified confirmation.
+- Parsing intent in the browser with regular expressions for every engine: rejected by the contract (the model recognizes intent); the regexes exist only in the mock.
+- One event type per action: rejected because the contract allows exactly one new event type.
 
 ## Inference engine
 

@@ -64,6 +64,29 @@ describe('streamChat', () => {
     expect(JSON.parse(init.body as string)).toEqual({ messages: history });
   });
 
+  it('sends the open to-dos and reports an action event (B-11)', async () => {
+    const fetchMock = mockFetch(
+      ndjson([
+        { type: 'start', engine: 'mock', model: 'echo' },
+        { type: 'action', action: { kind: 'complete', id: 't1', query: 'the deploy one' } },
+        { type: 'done' },
+      ]),
+    );
+    const onAction = vi.fn();
+    const todos = [{ id: 't1', text: 'ask Ana how deploys work' }];
+
+    await streamChat(history, { onDelta: vi.fn(), onAction, todos });
+
+    expect(onAction).toHaveBeenCalledWith({ kind: 'complete', id: 't1', query: 'the deploy one' });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ messages: history, todos });
+  });
+
+  it('rejects an action event with an invalid action as "malformed"', async () => {
+    mockFetch(ndjson(['{"type":"action","action":{"kind":"add","text":"  "}}']));
+    expect((await failure(streamChat(history, { onDelta: vi.fn() }))).info.code).toBe('malformed');
+  });
+
   it('turns a server error event into a ChatError with its code and engine', async () => {
     mockFetch(
       ndjson([

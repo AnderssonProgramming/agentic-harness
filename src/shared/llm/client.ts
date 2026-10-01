@@ -1,9 +1,13 @@
 import { chatError, isChatError } from './errors.ts';
 import { readLines } from './lines.ts';
-import { isStreamEvent, type ChatTurn } from './protocol.ts';
+import { isStreamEvent, type ChatTurn, type TodoAction, type TodoRef } from './protocol.ts';
 
 export interface StreamChatOptions {
   onDelta: (text: string) => void;
+  /** The model asked for a to-do action; the caller runs it (ADR-11). */
+  onAction?: (action: TodoAction) => void;
+  /** The user's open to-dos, sent so the model can name one. */
+  todos?: readonly TodoRef[];
   onStart?: (source: { engine: string; model: string }) => void;
   /** Aborting it stops the reply; streamChat then rejects with code "aborted". */
   signal?: AbortSignal;
@@ -46,7 +50,7 @@ export async function streamChat(
     const response = await fetch(options.endpoint ?? DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify(options.todos ? { messages, todos: options.todos } : { messages }),
       signal: controller.signal,
     });
     const type = response.headers.get('content-type') ?? '';
@@ -72,6 +76,8 @@ export async function streamChat(
         options.onStart?.({ engine: event.engine, model: event.model });
       } else if (event.type === 'delta') {
         options.onDelta(event.text);
+      } else if (event.type === 'action') {
+        options.onAction?.(event.action);
       } else if (event.type === 'error') {
         throw chatError(event.error.code, event.error.message, event.error.engine ?? engine);
       } else {
