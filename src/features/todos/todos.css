@@ -1,0 +1,55 @@
+/* To-do action cards (B-11, ADR-11). The same element moves from pending to its result. */
+.todo-card {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: calc(var(--radius) / 2);
+  background: var(--color-surface);
+  transition:
+    border-color 200ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.todo-card--pending {
+  opacity: 0.7;
+  border-left-color: var(--color-muted);
+}
+
+.todo-card--success {
+  border-left-color: var(--color-accent);
+}
+
+.todo-card--question {
+  border-left-color: var(--color-muted);
+}
+
+.todo-card--failure {
+  border-left-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.todo-card__title {
+  margin: 0;
+}
+
+.todo-card__items {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.todo-card__item--done {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.todo-card__done {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-card {
+    transition: none;
+  }
+}
