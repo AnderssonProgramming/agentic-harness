@@ -1,0 +1,95 @@
+import { chatError, isChatError } from './errors.ts';
+import { readLines } from './lines.ts';
+import { isStreamEvent, type ChatTurn } from './protocol.ts';
+
+export interface StreamChatOptions {
+  onDelta: (text: string) => void;
+  onStart?: (source: { engine: string; model: string }) => void;
+  /** Aborting it stops the reply; streamChat then rejects with code "aborted". */
+  signal?: AbortSignal;
+  /** Fails with "timeout" when no data arrives for this long. */
+  idleTimeoutMs?: number;
+  endpoint?: string;
+}
+
+const DEFAULT_ENDPOINT = '{{route}}';
+const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
+const IDLE_TIMEOUT = 'idle-timeout';
+
+/**
+ * Sends the whole conversation and streams the reply through onDelta.
+ * Resolves when the reply is complete; rejects with a ChatError in every failure case.
+ */
+export async function streamChat(
+  messages: readonly ChatTurn[],
+  options: StreamChatOptions,
+): Promise<void> {
+  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+  const controller = new AbortController();
+  const stopFromCaller = () => {
+    controller.abort();
+  };
+  options.signal?.addEventListener('abort', stopFromCaller);
+  if (options.signal?.aborted) controller.abort();
+
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const restartIdleTimer = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      controller.abort(IDLE_TIMEOUT);
+    }, idleTimeoutMs);
+  };
+
+  let engine: string | null = null;
+  try {
+    restartIdleTimer();
+    const response = await fetch(options.endpoint ?? DEFAULT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+    const type = response.headers.get('content-type') ?? '';
+    if (!response.body || !type.includes('application/x-ndjson')) {
+      throw chatError('malformed', `Unexpected response: HTTP ${String(response.status)} ${type}`);
+    }
+
+    let finished = false;
+    for await (const line of readLines(response.body, controller.signal)) {
+      restartIdleTimer();
+      if (line.trim() === '') continue;
+      let event: unknown;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        throw chatError('malformed', `Not JSON: ${line.slice(0, 120)}`, engine);
+      }
+      if (!isStreamEvent(event)) {
+        throw chatError('malformed', `Unknown event: ${line.slice(0, 120)}`, engine);
+      }
+      if (event.type === 'start') {
+        engine = event.engine;
+        options.onStart?.({ engine: event.engine, model: event.model });
+      } else if (event.type === 'delta') {
+        options.onDelta(event.text);
+      } else if (event.type === 'error') {
+        throw chatError(event.error.code, event.error.message, event.error.engine ?? engine);
+      } else {
+        finished = true;
+        break;
+      }
+    }
+    if (!finished)
+      throw chatError('malformed', 'The stream ended before the reply was complete', engine);
+  } catch (error) {
+    if (isChatError(error)) throw error;
+    if (options.signal?.aborted) throw chatError('aborted', 'Stopped by the user', engine);
+    if (controller.signal.reason === IDLE_TIMEOUT)
+      throw chatError('timeout', `No data for ${String(idleTimeoutMs)} ms`, engine);
+    // fetch rejects with a TypeError when the network is down or the server is unreachable.
+    throw chatError('network', error instanceof Error ? error.message : String(error), engine);
+  } finally {
+    clearTimeout(idleTimer);
+    options.signal?.removeEventListener('abort', stopFromCaller);
+  }
+}

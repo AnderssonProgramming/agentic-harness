@@ -9,7 +9,10 @@
       "Bash(npm test)",
       "Bash(npm run verify:route:*)",
       "Bash(npm run verify:chat:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Skill(llm-connect)",
+      "Bash(node .claude/skills/llm-connect/scaffold.mjs:*)",
+      "Bash(npm run verify:llm)"
     ],
     "deny": [
       "Read(./node_modules/**)",
