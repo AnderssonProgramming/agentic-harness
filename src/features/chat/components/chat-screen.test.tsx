@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatError } from '../../../shared/llm/errors';
 import { sendChat, type SendChat } from '../api/chat-api';
+import { conversationStore } from '../api/conversation-store';
 import { ChatScreen } from './chat-screen';
 
 vi.mock('../api/chat-api', () => ({ sendChat: vi.fn() }));
@@ -10,6 +11,8 @@ const mockedSend = vi.mocked(sendChat);
 
 afterEach(() => {
   mockedSend.mockReset();
+  // The screen saves to the real (jsdom) storage; each test starts from an empty conversation.
+  conversationStore.clear();
 });
 
 /** A fake model that echoes the question back in two chunks. */
