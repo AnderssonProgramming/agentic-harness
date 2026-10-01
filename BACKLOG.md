@@ -140,3 +140,22 @@ Acceptance criteria:
 - Suggestions disappear once the conversation has at least one message.
 
 Status: pending
+
+### [B-11] Onboarding to-do list the assistant manages
+
+As a junior developer who doesn't want to interrupt seniors, I want to tell Compass what to remember ("remind me to ask Ana how deploys work") and later ask what's pending or say what I've done, so nothing I need to ask or do gets lost, and I can trust what Compass says about my list.
+
+Acceptance criteria (observable behavior; "stored" means what's in the browser's storage, checked directly, not what the assistant says):
+
+- **Add:** "Remind me to ask Ana how deploys work" → a new open to-do with that meaning is **stored**, and the chat shows a confirmation built from the stored item ("Added to your list: …").
+- **List:** "What's on my list?" → the chat shows exactly the stored to-dos, open first, with done ones marked. The count matches storage. An empty list says it's empty.
+- **Complete:** "Mark the deploy one as done" → that stored to-do becomes done, and the confirmation names it. If no to-do or more than one matches, nothing changes and Compass asks which one.
+- **Honest failure:** if storage fails (blocked or full), the action isn't applied, the chat says clearly it couldn't save, and the app keeps working. **The chat never shows a confirmation for an action whose data didn't change.**
+- **The model never claims success itself:** confirmations come only from the app, after the data changed. Text the model streams around an action can't say "done" or "added" on its own.
+- **In-between states:** while an action runs, its card shows a pending state. It then turns into success or failure with a short transition, and there's no animation under `prefers-reduced-motion`.
+- **Survives a restart:** to-dos and the conversation, including the confirmation cards, are still there after closing and reopening the browser.
+- **Doesn't break the chat:** ordinary questions still stream ordinary replies, and the next turn after an action still has the conversation's context.
+- **Engines:** works with Anthropic (live) and the mock engine (deterministic, for tests). With Ollama `phi3`, which has no tool calling, Compass answers in plain text and never shows a false confirmation.
+- **Evidence:** unit tests for intent mapping, execution and failure, plus a browser check that reads storage directly, including a restart.
+
+Status: pending
