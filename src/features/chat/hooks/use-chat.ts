@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatError, isChatError } from '../../../shared/llm/errors';
+import type { TodoAction } from '../../../shared/llm/protocol';
+import { todoActions as defaultTodoActions, type TodoActions } from '../../todos';
 import { sendChat, type SendChat } from '../api/chat-api';
 import {
   conversationStore,
@@ -15,6 +17,8 @@ import {
   historyBefore,
   isReplying,
   resetReply,
+  settleAction,
+  startAction,
   startExchange,
   type Message,
   type MessageSource,
@@ -47,6 +51,7 @@ interface UseChatOptions {
   source?: MessageSource;
   send?: SendChat;
   store?: ConversationStore;
+  todos?: TodoActions;
 }
 
 interface Restored {
@@ -65,6 +70,7 @@ export function useChat({
   source = browserSource,
   send = sendChat,
   store = conversationStore,
+  todos = defaultTodoActions,
 }: UseChatOptions = {}): Chat {
   // Restoring inside the initializer avoids an empty first render (B-08).
   const [initial] = useState(() => restore(store));
@@ -103,14 +109,27 @@ export function useChat({
     async (replyId: string) => {
       const controller = new AbortController();
       inFlight.current = controller;
+      const requested: { action: TodoAction | null } = { action: null };
       try {
         await send(historyBefore(latest.current, replyId), {
           signal: controller.signal,
+          todos: todos.openRefs(),
           onDelta: (text) => {
             update((current) => appendToReply(current, replyId, text), saveSoon);
           },
+          onAction: (action) => {
+            requested.action ??= action;
+            update((current) => startAction(current, replyId, action));
+          },
         });
-        update((current) => finishReply(current, replyId));
+        // Runs only once the reply is complete, so a failed or stopped reply changes nothing (ADR-11).
+        const { action } = requested;
+        if (action) {
+          const card = todos.execute(action);
+          update((current) => settleAction(current, replyId, card));
+        } else {
+          update((current) => finishReply(current, replyId));
+        }
       } catch (error) {
         const info = isChatError(error) ? error.info : chatError('unknown', String(error)).info;
         update((current) => failReply(current, replyId, info));
@@ -118,7 +137,7 @@ export function useChat({
         if (inFlight.current === controller) inFlight.current = null;
       }
     },
-    [saveSoon, send, update],
+    [saveSoon, send, todos, update],
   );
 
   const sendDraft = useCallback(

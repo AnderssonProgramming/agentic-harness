@@ -1,10 +1,26 @@
 import { isChatErrorInfo } from '../../../shared/llm/protocol';
+import { isTodoActionState } from '../../todos';
 import type { Message } from './message';
 
-export const SNAPSHOT_VERSION = 1;
+/** Version 2 (B-11) added `action` to every message. */
+export const SNAPSHOT_VERSION = 2;
 
-/** Migration `n` turns version-`n` data into version `n + 1`. Empty in production until a format changes. */
+/** Migration `n` turns version-`n` data into version `n + 1`. */
 export type Migrations = Readonly<Record<number, (data: Record<string, unknown>) => unknown>>;
+
+/** The production migrations: every stored format since B-08 reaches the current one. */
+export const CONVERSATION_MIGRATIONS: Migrations = {
+  // Version 1 had no to-do actions: every message gets `action: null`.
+  1: (data) => ({
+    ...data,
+    version: 2,
+    messages: Array.isArray(data.messages)
+      ? data.messages.map((message: unknown) =>
+          isRecord(message) ? { ...message, action: null } : message,
+        )
+      : data.messages,
+  }),
+};
 
 export type RestoreOutcome = 'restored' | 'empty' | 'reset';
 
@@ -33,7 +49,8 @@ function isMessage(value: unknown): value is Message {
     typeof value.createdAt === 'number' &&
     Number.isFinite(value.createdAt) &&
     STATUSES.includes(value.status) &&
-    (value.error === null || isChatErrorInfo(value.error))
+    (value.error === null || isChatErrorInfo(value.error)) &&
+    (value.action === null || isTodoActionState(value.action))
   );
 }
 
@@ -51,9 +68,18 @@ function migrate(data: Record<string, unknown>, migrations: Migrations): unknown
   return current;
 }
 
-/** A reply can't still be streaming after a restart: it comes back stopped, keeping its text (B-08). */
+/**
+ * A reply can't still be streaming after a restart: it comes back stopped, keeping its text (B-08).
+ * A to-do action still pending never ran, so it's dropped (B-11).
+ */
 function settle(message: Message): Message {
-  return message.status === 'streaming' ? { ...message, status: 'stopped' } : message;
+  return message.status === 'streaming'
+    ? {
+        ...message,
+        status: 'stopped',
+        action: message.action?.status === 'pending' ? null : message.action,
+      }
+    : message;
 }
 
 /**
@@ -62,7 +88,7 @@ function settle(message: Message): Message {
  */
 export function restoreSnapshot(
   raw: string | null,
-  migrations: Migrations = {},
+  migrations: Migrations = CONVERSATION_MIGRATIONS,
 ): RestoredConversation {
   if (raw === null) return { messages: [], outcome: 'empty' };
   try {

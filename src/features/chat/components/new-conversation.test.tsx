@@ -5,7 +5,15 @@ import type { Message } from '../model/message';
 import { NewConversation } from './new-conversation';
 
 const messages: readonly Message[] = [
-  { id: 'id-1', author: 'user', text: 'Hi', createdAt: 1_000, status: 'done', error: null },
+  {
+    id: 'id-1',
+    author: 'user',
+    text: 'Hi',
+    createdAt: 1_000,
+    status: 'done',
+    error: null,
+    action: null,
+  },
 ];
 
 function setup(list: readonly Message[] = messages) {

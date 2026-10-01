@@ -1,4 +1,5 @@
-import type { ChatErrorInfo, ChatTurn } from '../../../shared/llm/protocol';
+import type { ChatErrorInfo, ChatTurn, TodoAction } from '../../../shared/llm/protocol';
+import { cardSummary, type TodoActionState, type TodoCard } from '../../todos';
 
 export type Author = 'user' | 'assistant';
 
@@ -12,6 +13,8 @@ export interface Message {
   createdAt: number;
   status: MessageStatus;
   error: ChatErrorInfo | null;
+  /** A to-do action the reply requested, and then the app's card for it (B-11, ADR-11). */
+  action: TodoActionState | null;
 }
 
 export interface MessageSource {
@@ -58,6 +61,7 @@ export function startExchange(
     createdAt: source.now(),
     status: 'done',
     error: null,
+    action: null,
   };
   const reply: Message = {
     id: source.newId(),
@@ -66,6 +70,7 @@ export function startExchange(
     createdAt: source.now(),
     status: 'streaming',
     error: null,
+    action: null,
   };
   return { messages: [...messages, user, reply], replyId: reply.id };
 }
@@ -78,21 +83,44 @@ function updateReply(
   return messages.map((message) => (message.id === replyId ? change(message) : message));
 }
 
+/** Text that arrives after a to-do action is dropped: only the app's card speaks for it (ADR-11). */
 export function appendToReply(messages: readonly Message[], replyId: string, text: string) {
-  return updateReply(messages, replyId, (reply) => ({ ...reply, text: reply.text + text }));
+  return updateReply(messages, replyId, (reply) =>
+    reply.action ? reply : { ...reply, text: reply.text + text },
+  );
 }
 
 export function finishReply(messages: readonly Message[], replyId: string) {
   return updateReply(messages, replyId, (reply) => ({ ...reply, status: 'done' }));
 }
 
-/** Keeps any partial text. A user's Stop is "stopped", not an error. */
-export function failReply(messages: readonly Message[], replyId: string, error: ChatErrorInfo) {
+/**
+ * The reply asked for a to-do action: its card shows as pending, and any text the model streamed
+ * is dropped, so it can't confirm anything on its own (B-11). Only the first action counts.
+ */
+export function startAction(messages: readonly Message[], replyId: string, request: TodoAction) {
   return updateReply(messages, replyId, (reply) =>
-    error.code === 'aborted'
-      ? { ...reply, status: 'stopped' }
-      : { ...reply, status: 'error', error },
+    reply.action ? reply : { ...reply, text: '', action: { status: 'pending', request } },
   );
+}
+
+/** The app ran the action: the reply is done and shows the card built from storage. */
+export function settleAction(messages: readonly Message[], replyId: string, card: TodoCard) {
+  return updateReply(messages, replyId, (reply) => ({
+    ...reply,
+    status: 'done',
+    action: { status: 'settled', card },
+  }));
+}
+
+/** Keeps any partial text. A user's Stop is "stopped", not an error. A pending action never runs. */
+export function failReply(messages: readonly Message[], replyId: string, error: ChatErrorInfo) {
+  return updateReply(messages, replyId, (reply) => {
+    const action = reply.action?.status === 'pending' ? null : reply.action;
+    return error.code === 'aborted'
+      ? { ...reply, status: 'stopped', action }
+      : { ...reply, status: 'error', error, action };
+  });
 }
 
 /** Clears a failed reply so it can be streamed again. The user's message is never touched (B-05). */
@@ -102,7 +130,13 @@ export function resetReply(messages: readonly Message[], replyId: string) {
     text: '',
     status: 'streaming',
     error: null,
+    action: null,
   }));
+}
+
+/** What the model reads for a message: the text, or for a to-do action the app's card (B-11). */
+function turnContent(message: Message): string {
+  return message.action?.status === 'settled' ? cardSummary(message.action.card) : message.text;
 }
 
 /**
@@ -112,8 +146,10 @@ export function resetReply(messages: readonly Message[], replyId: string) {
 export function historyBefore(messages: readonly Message[], replyId: string): ChatTurn[] {
   const end = messages.findIndex((message) => message.id === replyId);
   return (end === -1 ? messages : messages.slice(0, end))
+    .map((message) => ({ message, content: turnContent(message) }))
     .filter(
-      (message) => message.author === 'user' || (message.status !== 'error' && message.text !== ''),
+      ({ message, content }) =>
+        message.author === 'user' || (message.status !== 'error' && content !== ''),
     )
-    .map((message) => ({ role: message.author, content: message.text }));
+    .map(({ message, content }) => ({ role: message.author, content }));
 }

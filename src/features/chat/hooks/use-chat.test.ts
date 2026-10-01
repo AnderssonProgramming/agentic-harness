@@ -5,6 +5,7 @@ import { chatError } from '../../../shared/llm/errors';
 import type { ChatTurn } from '../../../shared/llm/protocol';
 import type { SendChat } from '../api/chat-api';
 import type { ConversationStore, LoadResult, StoreResult } from '../api/conversation-store';
+import type { TodoActions, TodoCard } from '../../todos';
 import type { Message } from '../model/message';
 import { TEXT_SAVE_INTERVAL_MS, useChat } from './use-chat';
 
@@ -57,12 +58,29 @@ function fakeStore(
   return { store, state };
 }
 
-function renderChat(send: SendChat, store = fakeStore().store) {
-  return renderHook(() => useChat({ send, store }));
+/** A to-do list the test controls: what's open, and the card each action produces. */
+function fakeTodos(card: TodoCard = { kind: 'listed', todos: [] }) {
+  const todos: TodoActions = {
+    openRefs: vi.fn(() => [{ id: 't1', text: 'ask Ana how deploys work' }]),
+    execute: vi.fn(() => card),
+  };
+  return todos;
+}
+
+function renderChat(send: SendChat, store = fakeStore().store, todos = fakeTodos()) {
+  return renderHook(() => useChat({ send, store, todos }));
 }
 
 const savedConversation: readonly Message[] = [
-  { id: 'id-1', author: 'user', text: 'Hi', createdAt: 1_000, status: 'done', error: null },
+  {
+    id: 'id-1',
+    author: 'user',
+    text: 'Hi',
+    createdAt: 1_000,
+    status: 'done',
+    error: null,
+    action: null,
+  },
   {
     id: 'id-2',
     author: 'assistant',
@@ -70,6 +88,7 @@ const savedConversation: readonly Message[] = [
     createdAt: 1_000,
     status: 'stopped',
     error: null,
+    action: null,
   },
 ];
 
@@ -165,6 +184,128 @@ describe('useChat', () => {
     expect(model.calls).toHaveLength(2);
     expect(model.last().history).toEqual([{ role: 'user', content: 'Hello' }]);
     expect(result.current.messages.at(-1)?.status).toBe('streaming');
+  });
+
+  describe('to-do actions (B-11)', () => {
+    const added: TodoCard = {
+      kind: 'added',
+      todo: { id: 't9', text: 'ask Ana how deploys work', done: false },
+    };
+
+    it('sends the open to-dos, shows a pending card, and runs the action only when the reply ends', async () => {
+      const model = controllableSend();
+      const { store, state } = fakeStore();
+      const todos = fakeTodos(added);
+      const { result } = renderChat(model.send, store, todos);
+      act(() => {
+        result.current.send('Remind me to ask Ana how deploys work');
+      });
+      expect(model.last().options.todos).toEqual([{ id: 't1', text: 'ask Ana how deploys work' }]);
+
+      act(() => {
+        model.last().options.onDelta('Sure, I added it!');
+        model.last().options.onAction?.({ kind: 'add', text: 'ask Ana how deploys work' });
+        model.last().options.onDelta(' Done.');
+      });
+      expect(result.current.messages.at(-1)).toMatchObject({
+        text: '',
+        status: 'streaming',
+        action: { status: 'pending', request: { kind: 'add' } },
+      });
+      expect(todos.execute).not.toHaveBeenCalled();
+
+      await act(async () => {
+        model.last().finish();
+        await Promise.resolve();
+      });
+      expect(todos.execute).toHaveBeenCalledTimes(1);
+      expect(result.current.messages.at(-1)).toMatchObject({
+        text: '',
+        status: 'done',
+        action: { status: 'settled', card: added },
+      });
+      expect(state.saved?.at(-1)?.action).toEqual({ status: 'settled', card: added });
+    });
+
+    it('runs only the first action of a reply', async () => {
+      const model = controllableSend();
+      const todos = fakeTodos(added);
+      const { result } = renderChat(model.send, fakeStore().store, todos);
+      act(() => {
+        result.current.send('Remind me to ask Ana how deploys work');
+      });
+      await act(async () => {
+        model.last().options.onAction?.({ kind: 'add', text: 'ask Ana how deploys work' });
+        model.last().options.onAction?.({ kind: 'list' });
+        model.last().finish();
+        await Promise.resolve();
+      });
+      expect(todos.execute).toHaveBeenCalledTimes(1);
+      expect(todos.execute).toHaveBeenCalledWith({ kind: 'add', text: 'ask Ana how deploys work' });
+    });
+
+    it.each([
+      ['fails', chatError('network', 'offline'), 'error'],
+      ['is stopped', chatError('aborted', 'stopped'), 'stopped'],
+    ])('never runs the action when the reply %s', async (_, error, status) => {
+      const model = controllableSend();
+      const todos = fakeTodos(added);
+      const { result } = renderChat(model.send, fakeStore().store, todos);
+      act(() => {
+        result.current.send('Remind me to ask Ana how deploys work');
+      });
+      await act(async () => {
+        model.last().options.onAction?.({ kind: 'add', text: 'ask Ana how deploys work' });
+        model.last().fail(error);
+        await Promise.resolve();
+      });
+      expect(todos.execute).not.toHaveBeenCalled();
+      expect(result.current.messages.at(-1)).toMatchObject({ status, action: null });
+    });
+
+    it('gives the next turn the card as context', async () => {
+      const model = controllableSend();
+      const { result } = renderChat(model.send, fakeStore().store, fakeTodos(added));
+      act(() => {
+        result.current.send('Remind me to ask Ana how deploys work');
+      });
+      await act(async () => {
+        model.last().options.onAction?.({ kind: 'add', text: 'ask Ana how deploys work' });
+        model.last().finish();
+        await Promise.resolve();
+      });
+      act(() => {
+        result.current.send('Thanks');
+      });
+      expect(model.last().history).toEqual([
+        { role: 'user', content: 'Remind me to ask Ana how deploys work' },
+        {
+          role: 'assistant',
+          content: "[The app's to-do list] Added to your list: ask Ana how deploys work",
+        },
+        { role: 'user', content: 'Thanks' },
+      ]);
+    });
+
+    it('keeps ordinary replies unchanged and runs no action', async () => {
+      const model = controllableSend();
+      const todos = fakeTodos();
+      const { result } = renderChat(model.send, fakeStore().store, todos);
+      act(() => {
+        result.current.send('How do we name branches?');
+      });
+      await act(async () => {
+        model.last().options.onDelta('Ask your team.');
+        model.last().finish();
+        await Promise.resolve();
+      });
+      expect(result.current.messages.at(-1)).toMatchObject({
+        text: 'Ask your team.',
+        status: 'done',
+        action: null,
+      });
+      expect(todos.execute).not.toHaveBeenCalled();
+    });
   });
 
   it('stops a reply on request and keeps the partial text', async () => {

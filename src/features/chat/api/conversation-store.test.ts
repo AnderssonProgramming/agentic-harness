@@ -24,8 +24,24 @@ function fakeStorage(overrides: Partial<Storage> = {}): Storage {
 }
 
 const messages: readonly Message[] = [
-  { id: 'id-1', author: 'user', text: 'Hi', createdAt: 1_000, status: 'done', error: null },
-  { id: 'id-2', author: 'assistant', text: 'Hello', createdAt: 1_000, status: 'done', error: null },
+  {
+    id: 'id-1',
+    author: 'user',
+    text: 'Hi',
+    createdAt: 1_000,
+    status: 'done',
+    error: null,
+    action: null,
+  },
+  {
+    id: 'id-2',
+    author: 'assistant',
+    text: 'Hello',
+    createdAt: 1_000,
+    status: 'done',
+    error: null,
+    action: null,
+  },
 ];
 
 describe('conversation store', () => {

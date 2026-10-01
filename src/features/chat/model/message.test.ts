@@ -10,10 +10,13 @@ import {
   historyBefore,
   isReplying,
   resetReply,
+  settleAction,
+  startAction,
   startExchange,
   type Message,
   type MessageSource,
 } from './message';
+import type { TodoCard } from '../../todos';
 
 function fakeSource(): MessageSource {
   let counter = 0;
@@ -124,6 +127,65 @@ describe('reply lifecycle', () => {
     const copy = structuredClone(messages);
     appendToReply(messages, messages[1]?.id ?? '', 'more');
     expect(messages).toEqual(copy);
+  });
+});
+
+describe('to-do action lifecycle (B-11)', () => {
+  const card: TodoCard = {
+    kind: 'added',
+    todo: { id: 't1', text: 'ask Ana how deploys work', done: false },
+  };
+
+  function withAction() {
+    const started = startExchange([], 'Remind me to ask Ana how deploys work', fakeSource());
+    if (!started) throw new Error('expected a start');
+    const { replyId } = started;
+    const streamed = appendToReply(started.messages, replyId, 'Sure, added!');
+    const pending = startAction(streamed, replyId, { kind: 'add', text: 'ask Ana' });
+    return { replyId, pending };
+  }
+
+  it('drops the model text when an action arrives, and ignores text and actions after it', () => {
+    const { replyId, pending } = withAction();
+    expect(pending[1]).toMatchObject({
+      text: '',
+      status: 'streaming',
+      action: { status: 'pending', request: { kind: 'add' } },
+    });
+    const later = startAction(appendToReply(pending, replyId, 'Done!'), replyId, { kind: 'list' });
+    expect(later[1]).toEqual(pending[1]);
+  });
+
+  it('settles the reply with the card', () => {
+    const { replyId, pending } = withAction();
+    expect(settleAction(pending, replyId, card)[1]).toMatchObject({
+      status: 'done',
+      action: { status: 'settled', card },
+    });
+  });
+
+  it('drops a pending action when the reply fails or is stopped', () => {
+    const { replyId, pending } = withAction();
+    expect(failReply(pending, replyId, chatError('network', 'x').info)[1]).toMatchObject({
+      status: 'error',
+      action: null,
+    });
+    expect(failReply(pending, replyId, chatError('aborted', 'x').info)[1]).toMatchObject({
+      status: 'stopped',
+      action: null,
+    });
+  });
+
+  it("sends a settled card to the model as the reply's text", () => {
+    const { replyId, pending } = withAction();
+    const settled = settleAction(pending, replyId, card);
+    expect(historyBefore(settled, 'none')).toEqual([
+      { role: 'user', content: 'Remind me to ask Ana how deploys work' },
+      {
+        role: 'assistant',
+        content: "[The app's to-do list] Added to your list: ask Ana how deploys work",
+      },
+    ]);
   });
 });
 

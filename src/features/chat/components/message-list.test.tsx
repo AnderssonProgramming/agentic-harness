@@ -12,6 +12,7 @@ const user = (id: string, text: string): Message => ({
   createdAt: 1,
   status: 'done',
   error: null,
+  action: null,
 });
 const reply = (id: string, text: string, rest: Partial<Message> = {}): Message => ({
   id,
@@ -20,6 +21,7 @@ const reply = (id: string, text: string, rest: Partial<Message> = {}): Message =
   createdAt: 2,
   status: 'done',
   error: null,
+  action: null,
   ...rest,
 });
 
@@ -107,5 +109,25 @@ describe('MessageList', () => {
     );
     expect(screen.getByText('Once upon')).toBeInTheDocument();
     expect(screen.getByText('Stopped')).toBeInTheDocument();
+  });
+
+  it("shows the app's to-do card for a reply with an action, pending then settled (B-11)", () => {
+    const pending = reply('r1', '', {
+      status: 'streaming',
+      action: { status: 'pending', request: { kind: 'list' } },
+    });
+    const { rerender } = render(
+      <MessageList messages={[user('u1', "What's on my list?"), pending]} onRetry={vi.fn()} />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Updating your list…');
+    expect(screen.queryByLabelText('Compass is typing')).not.toBeInTheDocument();
+
+    const settled = reply('r1', '', {
+      action: { status: 'settled', card: { kind: 'listed', todos: [] } },
+    });
+    rerender(
+      <MessageList messages={[user('u1', "What's on my list?"), settled]} onRetry={vi.fn()} />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Your list is empty.');
   });
 });
