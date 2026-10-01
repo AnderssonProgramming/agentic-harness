@@ -66,3 +66,33 @@ Score = times done × average minutes. It is the potential saving per sprint.
 - **Cost:** about USD 0.33–0.48 in model usage per run.
 
 The largest saving isn't minutes but consistency: every screen arrives with the same layers, loading and error states, tests and a browser check, and the skill refuses to build what isn't in the backlog.
+
+### [Skill 2] Connect the app to a model → `llm-connect` skill
+
+|                  | Before (built by hand once, in a sandbox, 2026-09-30)                                                                                      | With the skill                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| Agent wall-clock | **~20 min**: first sandbox test run at 18:47, all green just before `9137ed4` at 19:01, plus setup                                         | **77 s** on `main` (`ea79ed4`); 213–224 s in fresh clones         |
+| Failure loops    | 5: strict-lint findings, a client timeout that never fired, a leaked abort listener per word, Vite's native-loader extensions, test typing | 0 in the 3 passing runs                                           |
+| Files            | 22 written by hand, 6 configuration patches                                                                                                | 1 command                                                         |
+| Verification     | Assembled by hand                                                                                                                          | `check` (≈50 generated tests) + `verify:llm` (10 checks) built in |
+
+- **Saving per use:** about 18 minutes of agent time and 27 hand-made files. Correctness matters more than the minutes: the five defects above are already fixed in the templates.
+- **Estimated uses:** **once per project**, not per week. Its value is reuse across the program's projects, so it scores low on this repo's weekly scale. That's honest: it was required by the sprint, not chosen by the score.
+- **Cost:** about USD 0.40–0.58 per run.
+
+## New candidate measured this sprint
+
+### [T-05] Run a skill's reliability test (fresh clone → headless run → independent re-verification → summary)
+
+- Times done this sprint: **30 runs** (new-route: 21, including negative, probe and trusted-folder confirmation runs; llm-connect: 9), plus 3 self-correction attempts with the same harness
+- Time: about 3 minutes of agent run each, plus about 2 minutes of setup, waiting and summarizing, so **~5 min per run**
+- Manual steps per run: 6 (clone, `npm ci`, headless invocation with the right flags, `check`, `verify:*`, read the transcript for denials and the order of tool calls)
+- Stable steps: **yes**. The runner scripts already exist in the scratchpad (`run-skill.sh`, `run-llm.sh`, `summarize-run.cjs`, `show-loop.cjs`)
+- How I verify it: the independent `check` and `verify:*` exit codes, plus `git status` limited to the generator's files
+- Score: 33 × 5 = **165** (30 reliability runs + 3 self-correction attempts), the highest measured so far
+- Candidate: **yes, the Skill 3 candidate for Sprint 3** (`skill-reliability`), replacing T-02 (score 40)
+
+### [T-02] Contract test, updated
+
+- Times done: 8 in Sprint 1, plus 2 this sprint (self-correction attempts 1 and 2 used the same pattern), so 10 × 5 = 50
+- Still a candidate, ranked below T-05
