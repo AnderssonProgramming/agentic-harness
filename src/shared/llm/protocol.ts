@@ -65,6 +65,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export function isChatErrorInfo(value: unknown): value is ChatErrorInfo {
+  return (
+    isRecord(value) &&
+    isChatErrorCode(value.code) &&
+    typeof value.message === 'string' &&
+    (value.engine === null || typeof value.engine === 'string') &&
+    typeof value.retryable === 'boolean'
+  );
+}
+
 export function isStreamEvent(value: unknown): value is StreamEvent {
   if (!isRecord(value)) return false;
   switch (value.type) {
@@ -74,16 +84,8 @@ export function isStreamEvent(value: unknown): value is StreamEvent {
       return typeof value.text === 'string';
     case 'done':
       return true;
-    case 'error': {
-      const error = value.error;
-      return (
-        isRecord(error) &&
-        isChatErrorCode(error.code) &&
-        typeof error.message === 'string' &&
-        (error.engine === null || typeof error.engine === 'string') &&
-        typeof error.retryable === 'boolean'
-      );
-    }
+    case 'error':
+      return isChatErrorInfo(value.error);
     default:
       return false;
   }

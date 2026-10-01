@@ -35,6 +35,11 @@ export function isReplying(messages: readonly Message[]): boolean {
   return messages.some((message) => message.status === 'streaming');
 }
 
+/** Decides both whether "New conversation" is enabled and whether its handler acts. */
+export function canClear(messages: readonly Message[]): boolean {
+  return messages.length > 0;
+}
+
 /**
  * Adds the user's message and an empty assistant reply that will be streamed into.
  * Returns null for an invalid draft, or while another reply is still streaming (no double send).

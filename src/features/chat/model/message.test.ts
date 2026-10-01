@@ -3,6 +3,7 @@ import { chatError } from '../../../shared/llm/errors';
 import {
   MAX_MESSAGE_LENGTH,
   appendToReply,
+  canClear,
   checkDraft,
   failReply,
   finishReply,
@@ -123,6 +124,18 @@ describe('reply lifecycle', () => {
     const copy = structuredClone(messages);
     appendToReply(messages, messages[1]?.id ?? '', 'more');
     expect(messages).toEqual(copy);
+  });
+});
+
+describe('canClear', () => {
+  it('is false for an empty conversation and true once there is a message', () => {
+    expect(canClear([])).toBe(false);
+    expect(canClear(exchange([], 'Hi', 'Hello').messages)).toBe(true);
+  });
+
+  it('is true while a reply is streaming, since clearing stops it first', () => {
+    const started = startExchange([], 'Hi', fakeSource());
+    expect(canClear(started?.messages ?? [])).toBe(true);
   });
 });
 
