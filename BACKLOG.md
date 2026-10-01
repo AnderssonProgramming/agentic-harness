@@ -41,7 +41,7 @@ As a junior developer I want my question answered by a language model, so I get 
 
 Acceptance criteria:
 
-- A single `InferenceEngine` interface exposes `reply(history): Promise<string>`.
+- A single `Engine` interface on the server streams a reply for the whole history, and the browser receives it through `streamChat(history, { onDelta })` (ADR-09: streaming instead of `reply(history): Promise<string>`, so B-09 builds on the same path).
 - The Anthropic implementation is used when `INFERENCE_ENGINE=anthropic` (the default).
 - The API key is read only on the server side from `ANTHROPIC_API_KEY`; it never appears in the browser bundle (verified by searching `dist/`).
 - While waiting, the UI shows a "thinking" indicator; the reply appears as an assistant message.
