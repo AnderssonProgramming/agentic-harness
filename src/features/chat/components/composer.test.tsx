@@ -6,10 +6,13 @@ import { Composer } from './composer';
 
 function setup(onSend = vi.fn(() => true)) {
   const user = userEvent.setup();
-  render(<Composer onSend={onSend} />);
+  const onStop = vi.fn();
+  const view = render(<Composer onSend={onSend} onStop={onStop} replying={false} />);
   return {
     user,
     onSend,
+    onStop,
+    view,
     input: screen.getByRole('textbox', { name: 'Message' }),
     send: screen.getByRole('button', { name: 'Send' }),
   };
@@ -60,5 +63,24 @@ describe('Composer', () => {
     expect(screen.getByText(/too long/i)).toHaveTextContent(
       `Too long: ${String(MAX_MESSAGE_LENGTH + 1)} / ${String(MAX_MESSAGE_LENGTH)}`,
     );
+  });
+
+  it('while a reply streams, blocks sending, turns Send into Stop, and keeps the next draft', async () => {
+    const { user, input, onSend, onStop, view } = setup();
+    view.rerender(<Composer onSend={onSend} onStop={onStop} replying />);
+
+    await user.type(input, 'Next question{Enter}');
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input).toHaveValue('Next question');
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Compass is replying/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(onStop).toHaveBeenCalledOnce();
+    expect(input).toHaveFocus();
+
+    view.rerender(<Composer onSend={onSend} onStop={onStop} replying={false} />);
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onSend).toHaveBeenCalledWith('Next question');
   });
 });

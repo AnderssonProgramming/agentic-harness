@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { chatError } from '../../../shared/llm/errors';
 import {
   MAX_MESSAGE_LENGTH,
-  PLACEHOLDER_REPLY,
-  appendExchange,
+  appendToReply,
   checkDraft,
+  failReply,
+  finishReply,
+  historyBefore,
+  isReplying,
+  resetReply,
+  startExchange,
+  type Message,
   type MessageSource,
 } from './message';
 
@@ -12,20 +19,32 @@ function fakeSource(): MessageSource {
   return { newId: () => `id-${String(++counter)}`, now: () => 1_000 };
 }
 
+/** Runs one full exchange and returns the messages plus the reply's id. */
+function exchange(
+  messages: readonly Message[],
+  draft: string,
+  reply: string,
+  source = fakeSource(),
+) {
+  const started = startExchange(messages, draft, source);
+  if (!started) throw new Error('exchange did not start');
+  return {
+    replyId: started.replyId,
+    messages: finishReply(appendToReply(started.messages, started.replyId, reply), started.replyId),
+  };
+}
+
 describe('checkDraft', () => {
   it('rejects empty and whitespace-only drafts', () => {
     expect(checkDraft('')).toEqual({ valid: false, reason: 'empty' });
     expect(checkDraft('   \n\t ')).toEqual({ valid: false, reason: 'empty' });
   });
 
-  it('rejects drafts over the length limit', () => {
+  it('rejects drafts over the length limit and accepts one exactly at it', () => {
     expect(checkDraft('a'.repeat(MAX_MESSAGE_LENGTH + 1))).toEqual({
       valid: false,
       reason: 'too-long',
     });
-  });
-
-  it('accepts a draft exactly at the limit', () => {
     expect(checkDraft('a'.repeat(MAX_MESSAGE_LENGTH)).valid).toBe(true);
   });
 
@@ -37,29 +56,118 @@ describe('checkDraft', () => {
   });
 });
 
-describe('appendExchange', () => {
-  it('appends the user message and then the local assistant reply at the end', () => {
-    const source = fakeSource();
-    const first = appendExchange([], 'Hello', source);
-    const second = appendExchange(first, 'Where are the docs?', source);
-
-    expect(second.map((m) => [m.author, m.text])).toEqual([
-      ['user', 'Hello'],
-      ['assistant', PLACEHOLDER_REPLY],
-      ['user', 'Where are the docs?'],
-      ['assistant', PLACEHOLDER_REPLY],
+describe('startExchange', () => {
+  it('adds the user message and an empty streaming reply at the end', () => {
+    const started = startExchange([], '  Hello ', fakeSource());
+    expect(started?.messages.map((m) => [m.author, m.text, m.status])).toEqual([
+      ['user', 'Hello', 'done'],
+      ['assistant', '', 'streaming'],
     ]);
-    expect(new Set(second.map((m) => m.id)).size).toBe(4);
+    expect(started?.replyId).toBe('id-2');
   });
 
-  it('returns the same list untouched for an invalid draft', () => {
-    const messages = appendExchange([], 'Hi', fakeSource());
-    expect(appendExchange(messages, '   ', fakeSource())).toBe(messages);
+  it('refuses invalid drafts and a second send while a reply is streaming', () => {
+    expect(startExchange([], '   ', fakeSource())).toBeNull();
+    const started = startExchange([], 'First', fakeSource());
+    if (!started) throw new Error('expected a start');
+    expect(isReplying(started.messages)).toBe(true);
+    expect(startExchange(started.messages, 'Second', fakeSource())).toBeNull();
+  });
+});
+
+describe('reply lifecycle', () => {
+  it('streams text into the reply and finishes it', () => {
+    const { messages } = exchange([], 'Hi', 'Hello there');
+    expect(messages.at(-1)).toMatchObject({ text: 'Hello there', status: 'done' });
+    expect(isReplying(messages)).toBe(false);
+  });
+
+  it('keeps partial text and the error when a reply fails, and never touches the user message', () => {
+    const started = startExchange([], 'Hi', fakeSource());
+    if (!started) throw new Error('expected a start');
+    const partial = appendToReply(started.messages, started.replyId, 'Hel');
+    const failed = failReply(partial, started.replyId, chatError('network', 'offline').info);
+
+    expect(failed[0]).toEqual(started.messages[0]);
+    expect(failed[1]).toMatchObject({ text: 'Hel', status: 'error', error: { code: 'network' } });
+  });
+
+  it('marks a user stop as "stopped", not as an error', () => {
+    const started = startExchange([], 'Hi', fakeSource());
+    if (!started) throw new Error('expected a start');
+    const stopped = failReply(
+      appendToReply(started.messages, started.replyId, 'Partial'),
+      started.replyId,
+      chatError('aborted', 'stop').info,
+    );
+    expect(stopped[1]).toMatchObject({ text: 'Partial', status: 'stopped', error: null });
+  });
+
+  it('resets a failed reply so it can be retried', () => {
+    const started = startExchange([], 'Hi', fakeSource());
+    if (!started) throw new Error('expected a start');
+    const failed = failReply(
+      started.messages,
+      started.replyId,
+      chatError('rate_limit', '429').info,
+    );
+    expect(resetReply(failed, started.replyId)[1]).toMatchObject({
+      text: '',
+      status: 'streaming',
+      error: null,
+    });
   });
 
   it('does not mutate the previous list', () => {
-    const messages = appendExchange([], 'Hi', fakeSource());
-    appendExchange(messages, 'Again', fakeSource());
-    expect(messages).toHaveLength(2);
+    const { messages } = exchange([], 'Hi', 'Hello');
+    const copy = structuredClone(messages);
+    appendToReply(messages, messages[1]?.id ?? '', 'more');
+    expect(messages).toEqual(copy);
+  });
+});
+
+describe('historyBefore', () => {
+  it('sends every earlier turn, so the model keeps the context over five turns', () => {
+    const source = fakeSource();
+    let messages: readonly Message[] = [];
+    for (let turn = 1; turn <= 5; turn++) {
+      messages = exchange(
+        messages,
+        `Question ${String(turn)}`,
+        `Answer ${String(turn)}`,
+        source,
+      ).messages;
+    }
+    const sixth = startExchange(messages, 'Question 6', source);
+    if (!sixth) throw new Error('expected a start');
+
+    const history = historyBefore(sixth.messages, sixth.replyId);
+    expect(history).toHaveLength(11);
+    expect(history[0]).toEqual({ role: 'user', content: 'Question 1' });
+    expect(history.at(-2)).toEqual({ role: 'assistant', content: 'Answer 5' });
+    expect(history.at(-1)).toEqual({ role: 'user', content: 'Question 6' });
+  });
+
+  it('skips failed and empty replies but keeps stopped ones', () => {
+    const source = fakeSource();
+    const first = startExchange([], 'One', source);
+    if (!first) throw new Error('expected a start');
+    const failed = failReply(first.messages, first.replyId, chatError('network', 'x').info);
+    const second = startExchange(failed, 'Two', source);
+    if (!second) throw new Error('expected a start');
+    const stopped = failReply(
+      appendToReply(second.messages, second.replyId, 'Half'),
+      second.replyId,
+      chatError('aborted', 'x').info,
+    );
+    const third = startExchange(stopped, 'Three', source);
+    if (!third) throw new Error('expected a start');
+
+    expect(historyBefore(third.messages, third.replyId)).toEqual([
+      { role: 'user', content: 'One' },
+      { role: 'user', content: 'Two' },
+      { role: 'assistant', content: 'Half' },
+      { role: 'user', content: 'Three' },
+    ]);
   });
 });

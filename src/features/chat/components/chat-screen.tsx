@@ -5,8 +5,11 @@ import { Composer } from './composer';
 import { MessageList } from './message-list';
 
 export function ChatScreen() {
-  const { messages, send } = useChat();
-  const scrollRef = useAutoScroll<HTMLDivElement>(messages.length);
+  const { messages, replying, send, stop, retry } = useChat();
+  const last = messages.at(-1);
+  // Changes whenever the newest message grows or changes state, so a streaming reply stays in view.
+  const contentKey = last ? `${last.id}:${String(last.text.length)}:${last.status}` : '';
+  const scrollRef = useAutoScroll<HTMLDivElement>(messages.length, contentKey);
 
   return (
     <section className="chat" aria-labelledby="chat-title">
@@ -14,9 +17,9 @@ export function ChatScreen() {
         Chat
       </h2>
       <div className="chat__scroll" ref={scrollRef}>
-        <MessageList messages={messages} />
+        <MessageList messages={messages} onRetry={retry} />
       </div>
-      <Composer onSend={send} />
+      <Composer onSend={send} onStop={stop} replying={replying} />
     </section>
   );
 }
