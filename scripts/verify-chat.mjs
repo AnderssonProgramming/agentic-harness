@@ -297,11 +297,13 @@ try {
     );
     await page.evaluate(clearInput);
 
-    // Five turns with context, in a fresh conversation (a reload clears the chat until B-08)
-    await page.goto(app.url);
-    await page.waitFor(
-      "!!document.querySelector('#composer-input') && !document.querySelector('.message-list')",
+    // Five turns with context, in a fresh conversation (a reload restores the chat since B-08)
+    await page.evaluate(
+      "document.querySelector('.new-conversation__button[aria-expanded]').click()",
     );
+    await page.waitFor("!!document.querySelector('.new-conversation__button--danger')");
+    await page.evaluate("document.querySelector('.new-conversation__button--danger').click()");
+    await page.waitFor("!document.querySelector('.message-list')");
     await page.evaluate("document.querySelector('#composer-input').focus()");
     for (let i = 1; i <= 5; i++) {
       await say(`Context question ${String(i)}`);
