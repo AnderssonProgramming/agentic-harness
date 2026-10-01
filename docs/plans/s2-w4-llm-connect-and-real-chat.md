@@ -1,6 +1,6 @@
 # Plan: Sprint 2 week 4, items 2.3 to 2.5 (B-03, B-04, B-05, B-09)
 
-Status: approved by the Product Owner on 2026-09-30 (as written).
+Status: done. Approved by the Product Owner on 2026-09-30 (as written). Evidence: `docs/evidence/b-03-verification.md`, `skill-llm-connect-reliability.md`, `self-correction-loop.md`.
 Sources read: `CLAUDE.md`, `BACKLOG.md` (B-03, B-04, B-05, B-09), `ARCHITECTURE.md` (ADR-02, ADR-03, ADR-04, ADR-05, ADR-07), `docs/skills/llm-connect-design.txt`.
 
 ## Acceptance criteria
