@@ -74,7 +74,7 @@ describe('anthropicEngine', () => {
     expect(init.headers).toMatchObject({ 'x-api-key': 'test-key' });
     expect(JSON.parse(init.body as string)).toMatchObject({
       model: 'claude-test',
-      system: 'Be brief.',
+      system: expect.stringMatching(/^Be brief\.\n\n/) as unknown,
       stream: true,
       messages: [{ role: 'user', content: 'Hi' }],
     });
@@ -92,6 +92,103 @@ describe('anthropicEngine', () => {
     expect(
       await errorCode(collect(anthropicEngine({ ...options, fetchImpl: respond(body, status) }))),
     ).toBe(code);
+  });
+
+  it('declares the three to-do tools and lists the open to-dos in the system prompt (B-11)', async () => {
+    const fetchImpl = respond(sse({ type: 'message_stop' }));
+    await all(
+      anthropicEngine({ ...options, fetchImpl }).stream({
+        ...input(),
+        todos: [{ id: 't1', text: 'ask Ana how deploys work' }],
+      }),
+    );
+    const body = JSON.parse(vi.mocked(fetchImpl).mock.calls[0][1].body as string) as {
+      system: string;
+      tools: { name: string }[];
+      tool_choice: unknown;
+    };
+    expect(body.tools.map((tool) => tool.name)).toEqual([
+      'add_todo',
+      'list_todos',
+      'complete_todo',
+    ]);
+    expect(body.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: true });
+    expect(body.system).toContain('- t1: ask Ana how deploys work');
+  });
+
+  it('turns a streamed tool_use into one action, after any text (B-11)', async () => {
+    const fetchImpl = respond(
+      sse(
+        { type: 'message_start' },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Sure.' } },
+        { type: 'content_block_stop', index: 0 },
+        {
+          type: 'content_block_start',
+          index: 1,
+          content_block: { type: 'tool_use', id: 'tu_1', name: 'complete_todo', input: {} },
+        },
+        {
+          type: 'content_block_delta',
+          index: 1,
+          delta: { type: 'input_json_delta', partial_json: '{"id": "t1", "desc' },
+        },
+        {
+          type: 'content_block_delta',
+          index: 1,
+          delta: { type: 'input_json_delta', partial_json: 'ription": "the deploy one"}' },
+        },
+        { type: 'content_block_stop', index: 1 },
+        { type: 'message_delta', delta: { stop_reason: 'tool_use' } },
+        { type: 'message_stop' },
+      ),
+    );
+    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
+      'Sure.',
+      { kind: 'complete', id: 't1', query: 'the deploy one' },
+    ]);
+  });
+
+  it.each([
+    ['add_todo', '{"text": "set up the VPN"}', { kind: 'add', text: 'set up the VPN' }],
+    ['list_todos', '', { kind: 'list' }],
+  ])('maps %s to an action (B-11)', async (name, json, action) => {
+    const fetchImpl = respond(
+      sse(
+        { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', name } },
+        {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'input_json_delta', partial_json: json },
+        },
+        { type: 'content_block_stop', index: 0 },
+        { type: 'message_stop' },
+      ),
+    );
+    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([action]);
+  });
+
+  it('reports "malformed" for a tool call with bad input or an unknown tool (B-11)', async () => {
+    for (const [name, json] of [
+      ['add_todo', '{"text": ""}'],
+      ['delete_todo', '{}'],
+    ]) {
+      const fetchImpl = respond(
+        sse(
+          { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', name } },
+          {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'input_json_delta', partial_json: json },
+          },
+          { type: 'content_block_stop', index: 0 },
+          { type: 'message_stop' },
+        ),
+      );
+      expect(await errorCode(collect(anthropicEngine({ ...options, fetchImpl })))).toBe(
+        'malformed',
+      );
+    }
   });
 
   it('maps an error event in the middle of the stream', async () => {
