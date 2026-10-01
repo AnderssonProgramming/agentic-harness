@@ -115,7 +115,7 @@ Acceptance criteria:
 - **Boundaries:** storage is reached only through the chat feature's `api/` layer (ADR-07); components never touch `localStorage`.
 - **Evidence:** unit tests for saving, restoring and migrating, plus a browser check that restarts the browser and that simulates blocked storage.
 
-Status: in progress
+Status: done
 
 ### [B-09] Streaming replies
 

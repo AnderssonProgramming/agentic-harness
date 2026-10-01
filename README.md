@@ -32,20 +32,21 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 
 ## Commands
 
-| Command                                    | What it does                                                                                                          |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                              | Start the dev server on port 5173                                                                                     |
-| `npm run check`                            | Typecheck + lint + format check + tests. Must pass before any commit                                                  |
-| `npm test`                                 | Run the unit and component tests once (Vitest + Testing Library)                                                      |
-| `npm run verify:chat`                      | Check the chat in headless Chrome on the mock engine: streaming, Stop, offline error, Retry, 5 turns (19 checks) [^1] |
-| `npm run verify:chat -- --live`            | Five real turns with the engine in `.env`: context and time to first text [^1]                                        |
-| `npm run verify:llm`                       | Check the chat endpoint: stream, history, every error code, a real 401, secrets in the bundle                         |
-| `npm run verify:route -- <path> "<title>"` | Check that a route loads by URL and by nav click in headless Chrome [^1] [^2]                                         |
-| `npm run format`                           | Format all files with Prettier                                                                                        |
-| `npm run lint`                             | ESLint only                                                                                                           |
-| `npm run build`                            | Typecheck and build for production into `dist/`                                                                       |
-| `npm run preview`                          | Serve the production build locally                                                                                    |
-| `npm run engine:check`                     | Verify the configured inference engine answers (needs `.env`, see below)                                              |
+| Command                                    | What it does                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                              | Start the dev server on port 5173                                                                                         |
+| `npm run check`                            | Typecheck + lint + format check + tests. Must pass before any commit                                                      |
+| `npm test`                                 | Run the unit and component tests once (Vitest + Testing Library)                                                          |
+| `npm run verify:chat`                      | Check the chat in headless Chrome on the mock engine: streaming, Stop, offline error, Retry, 5 turns (19 checks) [^1]     |
+| `npm run verify:chat -- --live`            | Five real turns with the engine in `.env`: context and time to first text [^1]                                            |
+| `npm run verify:llm`                       | Check the chat endpoint: stream, history, every error code, a real 401, secrets in the bundle                             |
+| `npm run verify:persistence`               | Check that the conversation survives a real Chrome restart, New conversation, and blocked, full or corrupted storage [^1] |
+| `npm run verify:route -- <path> "<title>"` | Check that a route loads by URL and by nav click in headless Chrome [^1] [^2]                                             |
+| `npm run format`                           | Format all files with Prettier                                                                                            |
+| `npm run lint`                             | ESLint only                                                                                                               |
+| `npm run build`                            | Typecheck and build for production into `dist/`                                                                           |
+| `npm run preview`                          | Serve the production build locally                                                                                        |
+| `npm run engine:check`                     | Verify the configured inference engine answers (needs `.env`, see below)                                                  |
 
 [^1]: Uses the installed Google Chrome. If it's not at the default Windows path, set `CHROME_PATH`. Set `APP_URL` to check an already-running server instead of starting one.
 

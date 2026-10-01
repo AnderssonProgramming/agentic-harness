@@ -16,9 +16,10 @@ Read this table first. Then open only the ADRs your task touches, e.g. `Grep "AD
 | [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                        | Conversation state in `useChat` with `useState`; pure transitions; no state library      | Active                       | Chat state, persistence  |
 | [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                   | Fixed placeholder reply                                                                  | **Superseded** by B-03       | —                        |
 | [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                           | Route table + History API hook; no router library                                        | Active                       | Screens, navigation      |
-| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active                       | Network, storage access  |
+| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active (refined by ADR-10)   | Network, storage access  |
 | [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                         | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/` | Active                       | Server, endpoint         |
 | [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                | One NDJSON event stream; 13 error codes; mock engine                                     | Active                       | Streaming, errors, tests |
+| [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                               | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard               | Active                       | Persistence, storage     |
 
 New ADRs add a row here in the same commit.
 
@@ -151,6 +152,20 @@ Rejected alternatives:
 
 - Passing the provider's own stream through: rejected because the browser would need two parsers and would see provider-specific errors.
 - HTTP status codes for errors: rejected because once streaming starts the status is already sent, so mid-stream failures need an in-band event anyway. Using one mechanism for both is simpler.
+
+## [ADR-10] The conversation is saved through a synchronous store in `api/`
+
+Date: 2026-10-01
+
+Decision: `src/features/chat/api/conversation-store.ts` is the only code that touches browser storage. It saves the conversation in `localStorage` under `compass.conversation` as a versioned snapshot (`version: 1`), and its `load()`, `save()` and `clear()` are **synchronous**. This refines ADR-07: the boundary is the same, only the return type isn't a `Promise`. The store never throws: a blocked or full storage becomes a typed failure (`'unavailable'` or `'full'`), and unreadable data is removed and reported once as a reset. `model/conversation-snapshot.ts` validates and migrates the snapshot; the migrations table is a parameter, empty in production until a version 2 exists, and unknown or future versions start empty. A reply still streaming when the page closed comes back `stopped`. `useChat` saves status changes at once and streamed text at most once a second, plus on `pagehide`. An ESLint rule (`no-restricted-globals` and `no-restricted-properties`) forbids `localStorage` and `sessionStorage` everywhere in `src/` except `src/features/*/api/`.
+
+Reason: `localStorage` is synchronous, so a synchronous store lets `useChat` restore inside its `useState` initializer: the conversation is on screen at the first paint, with no empty-then-filled flash and no loading state to design and test. The lint rule turns "components never touch storage" into a check instead of a promise. Saving the whole conversation on every streamed token would rewrite it dozens of times a second; the cost of the one-second interval is that a browser crash (not a normal close) can lose up to one second of streamed text.
+
+Rejected alternatives:
+
+- An async store, as ADR-07 describes: rejected because it wraps a synchronous API in a `Promise` only to add a loading state and a flash of the empty chat on every start.
+- IndexedDB: rejected because it's async, needs far more code, and a text conversation is well within `localStorage`'s quota. A full quota is handled anyway.
+- A real "version 0" format to migrate from: rejected because no older data exists. The migration path is proven by a test with a fixture migration instead.
 
 ## Inference engine
 
