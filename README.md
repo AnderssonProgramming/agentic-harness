@@ -4,7 +4,7 @@ A conversational onboarding assistant for junior developers: it answers question
 
 This repository is also an **AI harness**: the coding agent that builds Compass works under a written contract, and every item it delivers comes with a plan, tests and recorded evidence.
 
-> **Status (end of Sprint 2):** Compass talks to a real model. Replies stream in as they're written, the conversation keeps its context, and network and API failures show a clear message with Retry. Two Custom Skills (`new-route`, `llm-connect`) each turn a multi-step task into one command, and both passed the three-runs-in-a-row reliability test.
+> **Status (Sprint 3, week 5):** Compass talks to a real model, streams replies, and keeps the conversation when you close and reopen the browser. A "New conversation" button clears it after you confirm. If the browser blocks or fills its storage, the chat keeps working and tells you. The persistence feature was built entirely by a delegated agent session from an approved plan ([evidence](docs/evidence/b-08-verification.md)), run under the context-control routine ([CONTEXT-ROUTINE.md](CONTEXT-ROUTINE.md)).
 
 ![Compass answering on turn 5 from what it was told on turns 1 and 2](docs/evidence/b-03-live-conversation.png)
 
@@ -60,6 +60,8 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 | [`.claude/settings.json`](.claude/settings.json)                                 | Enforced context exclusions and permissions                           |
 | [`BACKLOG.md`](BACKLOG.md)                                                       | Prioritized product backlog with acceptance criteria                  |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                             | Folder map, architecture decisions (ADR-01 to ADR-09), engine switch  |
+| [`CONTEXT-ROUTINE.md`](CONTEXT-ROUTINE.md)                                       | How to run a long agent session without it losing the thread          |
+| [`CONTEXT-LOG.md`](CONTEXT-LOG.md)                                               | Measured sessions: what filled the context and where quality dropped  |
 | [`TASKS.md`](TASKS.md)                                                           | Repeated tasks measured as Custom Skill candidates, with before/after |
 | [`.claude/skills/`](.claude/skills)                                              | Custom Skills (see below)                                             |
 | [`docs/plans/`](docs/plans)                                                      | Step-by-step plans approved by the Product Owner before any code      |
