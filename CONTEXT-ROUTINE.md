@@ -22,7 +22,7 @@ How to run a working session with the coding agent (Claude Code) without it losi
 ## During the task
 
 4. **Keep noisy work out of the conversation:**
-   - **Long or chatty commands** (installs, builds, the browser verifiers, dev servers) run in the background (`run_in_background`), and the agent reads only the result or the tail.
+   - **Long or chatty commands** (installs, builds, the browser verifiers, dev servers) run in the background (`run_in_background`), and the agent reads only the result or the tail. **Exception: in a headless session (`claude -p`), run them in the foreground with quiet flags.** A background task dies when the reply ends (long-session test, turn 1).
    - **Experiments and reliability runs** go in a separate headless session in a scratch clone: `claude -p … --output-format stream-json > run.jsonl`. Only the summary comes back.
    - **Broad searches** across many files go to a subagent (the _Explore_ agent), which returns conclusions, not file dumps.
 5. **Passing output is noise; failing output is signal.** Run checks quietly (`npm run -s check`). When one fails, read the full output of the **failing command** once (e.g. `npm run typecheck`), then fix it (CLAUDE.md, "Self-correction loop"). Don't paste whole passing logs or full JSON reports into the conversation.
@@ -61,4 +61,6 @@ Used from Sprint 3 on, when the PO's session must not do the coding:
 2. A new session gets **one** request: the item ID, "propose the plan in `docs/plans/`, then stop".
 3. The PO reviews the plan against the criteria and answers "approved" (or corrections) **in the same session**, so the plan stays in its context. For a headless session, use `claude -p … --resume <session-id>`.
 4. Execute **one step per request** ("execute step 1, then stop and report"), and verify independently between steps: `git log`, `npm run -s check`, and the step's own check.
-5. At the end, profile the transcript (`npm run context:profile`) and add anything new to `CONTEXT-LOG.md`.
+5. **Check the context after every turn** (`npm run context:profile -- turn.jsonl`, last value). Over 80k, send `/compact keep: <plan file>, <decisions>, steps done with their commits, next step, rules files>` before the next step. Don't let it slide: in the long-session test it reached 125k before anyone looked.
+6. If a turn is cut off mid-step (usage limit, crash), resume by compacting with "step N was interrupted; partial changes in <files>", then "continue step N". Don't start over.
+7. At the end, profile the transcripts and add anything new to `CONTEXT-LOG.md`.

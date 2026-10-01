@@ -45,6 +45,21 @@ Baseline: every fresh session starts at **about 30,000 tokens** before any work 
   - Moved the noisy work (reliability runs, the B-10 implementation) into separate headless sessions, which is why sessions 1 and 2 exist.
   - The session never compacted or restarted. It survived because every claim was re-verified against files and git, not against what it remembered.
 
+## Session 4: the long-session test, B-08 delegated (2026-10-01)
+
+- **Task:** B-08 conversation persistence, delegated to one session for its whole life. Plan, 8 steps and PO decisions took 15 turns over 2 h 44 min, with ≈ 39 min of active work (`docs/evidence/long-session-test.md`).
+- **What it loaded:** the routine worked on the reading side. Turn 1 read the ADR index plus two ADRs (4.6k of 12.4k characters), and `BACKLOG.md` only for B-08.
+- **When it started failing:**
+  - It didn't degrade in quality: none of the routine's signals appeared.
+  - The **process** slipped twice:
+    1. A background `check` in a headless session died with the reply, so the plan wasn't committed.
+    2. The context crossed 80k at step 5 and reached 125.6k before anyone measured it.
+- **Symptom:** none in the code. The risk was invisible until the transcript was profiled.
+- **What I did:**
+  - compacted 4 times (each to about 10–13k), the last two automatically
+  - added "headless → foreground" and "measure after every turn" to the routine
+  - resumed across a 2-hour usage-limit outage by compacting with the interrupted step's state
+
 ## The pattern
 
 | Cause                                                                                    | Seen in                                     | Cost                                                            |
