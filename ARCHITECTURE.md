@@ -15,6 +15,7 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
 ├── .claude/skills/         # Custom Skills (one folder per skill, SKILL.md inside)
 ├── docs/                   # contract tests and other evidence
 ├── scripts/                # Node scripts run by npm (no build step)
+├── server/llm/             # server-only: chat endpoint, engines, keys (ADR-08, ADR-09)
 ├── index.html              # Vite entry HTML
 └── src/
     ├── main.tsx            # mounts <App /> into #root, nothing else
@@ -30,6 +31,7 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
     │       ├── model/      # message.ts: types and pure functions (no React)
     │       └── api/        # integration point with external services (ADR-07), when needed
     └── shared/             # code used by two or more features
+        └── llm/            # wire protocol, errors and streamChat client (ADR-09)
 ```
 
 Folders may be empty until the backlog item that needs them is in progress.
@@ -78,7 +80,7 @@ Rejected alternative: a state library (Redux Toolkit, Zustand) or React Context.
 
 ## [ADR-05] Fixed local assistant reply until the model is connected
 
-Date: 2026-09-30
+Date: 2026-09-30. **Superseded by B-03 (Sprint 2, week 4):** the placeholder is removed once the chat streams real replies. The `mock` engine of ADR-09 takes over its role in tests.
 
 Decision: every accepted user message is followed by a fixed assistant message (`PLACEHOLDER_REPLY` in `model/message.ts`) that says the model connection arrives with B-03.
 
@@ -105,6 +107,32 @@ Decision: a feature that needs data from outside the browser gets `src/features/
 Reason: it's the integration point the Web track asks for. Loading and error states can be built and tested now, and when Skill 2 connects the model, only the body of the `api/` function changes. The hook, the view and their tests stay the same.
 
 Rejected alternative: calling `fetch` inside hooks. Rejected because the hook would then mix React state with transport details (URLs, headers, parsing), and every test of the hook would need to mock the network.
+
+## [ADR-08] The chat endpoint runs inside Vite's own server, mounted by a plugin
+
+Date: 2026-09-30
+
+Decision: `server/llm/handler.ts` is a plain Node `(req, res)` function. `server/llm/vite-plugin.ts` mounts it at `/api/chat` on Vite's dev **and** preview servers. Its variables come from `.env` through `loadEnv(mode, root, '')`, with no `VITE_` prefix, and the real environment wins over the file. Server code imports with explicit `.ts` extensions, because Vite 8's native config loader requires them for everything reachable from `vite.config.ts`.
+
+Reason: ADR-03 needs a server to hold the key, and the README promises one command to run the app. A plugin gives both with no new dependency. Because the handler only depends on `node:http` types, it can be mounted in any Node server when we deploy. This revisits ADR-02 without replacing it: the browser side is still a Vite SPA.
+
+Rejected alternatives:
+
+- A separate Express or Hono server with a Vite proxy: rejected because it means two processes, a new dependency, and `concurrently` to keep one command.
+- Next.js route handlers: rejected because it's the framework switch ADR-02 already turned down.
+
+## [ADR-09] One NDJSON event stream for every engine, plus a mock engine
+
+Date: 2026-09-30
+
+Decision: the endpoint takes `{ messages }` and always answers 200 with `application/x-ndjson`. The stream is `start` (engine, model), `delta`* (text), and then `done` or `error` (`code`, `message`, `engine`, `retryable`). Anthropic's server-sent events and Ollama's NDJSON are translated on the server, and failures are mapped to 13 codes (`network`, `timeout`, `auth`, `rate_limit`, `quota`, …). The browser shows `describeChatError(code)`, never the raw message. A third engine, `mock`, streams a deterministic echo that counts the user turns it received; `[mock:<code>]` in a message makes it fail with that code.
+
+Reason: the UI has one code path whichever engine answers, so switching engines (B-04) can't break the chat. Error codes let the UI say something useful ("Ollama isn't running…") and decide whether Retry makes sense. The mock makes browser tests and the error demo deterministic, free and offline, and the turn count proves the history arrives.
+
+Rejected alternatives:
+
+- Passing the provider's own stream through: rejected because the browser would need two parsers and would see provider-specific errors.
+- HTTP status codes for errors: rejected because once streaming starts the status is already sent, so mid-stream failures need an in-band event anyway. Using one mechanism for both is simpler.
 
 ## Inference engine
 
