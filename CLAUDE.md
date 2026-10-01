@@ -46,6 +46,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - Code is organized by feature, following ARCHITECTURE.md (ADR-01): `src/features/<feature>/`. Shared code goes in `src/shared/` only when two or more features use it.
 - Local services are addressed as `127.0.0.1`, not `localhost`, in Node code: Node 22 resolves `localhost` to IPv6 `::1` first, and Ollama listens only on IPv4.
 - Relative imports in `src/app/` and `src/features/` have no file extension. Only `server/**` and `src/shared/llm/**` use explicit `.ts` extensions, because Vite's native config loader needs them for everything reachable from `vite.config.ts` (ADR-08).
+- Browser storage (`localStorage`, `sessionStorage`) is used only in `src/features/*/api/`; ESLint enforces it (ADR-10). Saved data is versioned: any change to the shape of a stored type (e.g. a new field on `Message`) bumps the snapshot version and adds a migration with a test, in the same commit. Otherwise existing users' conversations are silently reset.
 - Comments only where the "why" is not obvious. No comments that restate the code.
 - All code, comments, commit messages and documentation are written in English.
 
