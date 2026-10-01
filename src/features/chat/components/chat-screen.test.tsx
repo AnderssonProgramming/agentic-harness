@@ -63,4 +63,46 @@ describe('ChatScreen', () => {
       'Re: Hello',
     );
   });
+
+  it('keeps the conversation on Cancel and clears it after confirming', async () => {
+    mockedSend.mockImplementation(echo);
+    const user = userEvent.setup();
+    render(<ChatScreen />);
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Hello{Enter}');
+    await waitFor(() => {
+      expect(within(screen.getByRole('log')).getAllByRole('listitem')).toHaveLength(2);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'New conversation' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(within(screen.getByRole('log')).getAllByRole('listitem')).toHaveLength(2);
+
+    await user.click(screen.getByRole('button', { name: 'New conversation' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByRole('heading', { name: /ask compass/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New conversation' })).toBeDisabled();
+    expect(conversationStore.load()).toEqual({
+      ok: true,
+      conversation: { messages: [], outcome: 'empty' },
+    });
+  });
+
+  it('keeps answering and shows a notice when the conversation cannot be saved', async () => {
+    const full = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    mockedSend.mockImplementation(echo);
+    const user = userEvent.setup();
+    render(<ChatScreen />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Hello{Enter}');
+    expect(screen.getByRole('status')).toHaveTextContent(/storage is full/);
+    await waitFor(() => {
+      expect(within(screen.getByRole('log')).getAllByRole('listitem')[1]).toHaveTextContent(
+        'Re: Hello',
+      );
+    });
+    full.mockRestore();
+  });
 });
