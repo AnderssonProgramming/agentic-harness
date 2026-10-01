@@ -79,7 +79,7 @@ When you need to know a library's API or types, do not try to open `node_modules
 
 ## Available skills
 
-Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill, use the skill instead of doing the work by hand, and follow its steps exactly. If a skill's steps don't fit the request, say so rather than improvising around them.
+Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill, use the skill instead of doing the work by hand, and follow its steps exactly. Invoke it through the Skill tool **before** running any of its commands. Reading `SKILL.md` and running its commands yourself bypasses the skill's pre-approved tools. If a skill's steps don't fit the request, say so rather than improvising around them.
 
 A listed skill's `SKILL.md` is a plan I have already approved. When I ask for a skill, you don't write a new plan for its steps. That approval covers **how**, never **what**: the work must still trace to a backlog item, and must not contradict an ADR. If it doesn't, stop and ask, as in any other task.
 
