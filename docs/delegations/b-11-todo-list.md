@@ -90,3 +90,41 @@ Commit as you go. Your final report must contain:
 3. **Decisions I made that this contract didn't cover**, each in one line. Leave none out, even small ones.
 4. **Anything you'd change in an existing ADR** (don't change it; just say it).
 5. **The final `npm run -s check` result.**
+
+## Amendment 1 (after pass 1, approved by the PO on 2026-10-01)
+
+### Why
+
+The PO's independent verification passed every check: check 226, verify:todos 12/12 mock and 8/8 live, and the regression suites. Then it found one criterion failing in practice. With `INFERENCE_ENGINE=ollama` (`phi3`), "Remind me to ask Ana how deploys work." got the reply _"Okay, I've set a reminder for you to ask Ana about deployments"_, and **nothing was stored**. The system-prompt mitigation doesn't hold for a small local model. The PO also overrules two decisions from pass 1's "Decisions I made" list.
+
+### Corrected behavior (all three are acceptance criteria for this pass)
+
+1. **Engines that can't run actions.** While the active engine has no tool calling (Ollama today):
+   - The chat shows a **standing app notice**: Compass can't change the to-do list with the current engine, and saved to-dos are safe.
+   - A message that matches the known to-do phrases ("remind me to …", "add … to my list", "what's on my list", "mark … as done") **is not answered by the model**. The app replies with a message that says the action wasn't performed and why. **Nothing stored changes.**
+   - Other wording still reaches the model, as today.
+   - The notice disappears when the engine can run actions.
+2. **Unreadable to-do data.** It's removed, as now, but the chat **says so once** ("Your saved to-do list couldn't be read, so it was reset"), the same way B-08 handles an unreadable conversation.
+3. **Several actions in one reply.** Every action the model requests runs **in order, each with its own card** (success or failure). None is dropped silently. Parallel tool use may be enabled.
+
+### Evidence required
+
+- **Unit tests** for each corrected behavior.
+- **`verify:todos` scenarios.** The mock gains a way to behave as an engine without tool calling, e.g. `MOCK_TOOLS=off`. If it's an environment variable, add it to `.env.example`. Scenarios:
+  - (a) the standing notice is shown, and a to-do phrase gets the app message with storage byte-identical;
+  - (b) corrupted to-do data gives the reset notice once;
+  - (c) two actions in one mock reply give two cards and both changes in storage.
+- **One live run with Ollama (`phi3`)**, recorded in `docs/evidence/b-11-verification.md`: the add phrase gives the app message, storage is unchanged, and the notice is visible. Allow for CPU slowness (about 20 s per reply).
+
+### Limits for this pass
+
+The same as above, plus:
+
+- `server/llm/**` may change to report whether an engine can run actions.
+- The mock may gain the no-tools mode.
+- `.env.example` may gain one variable.
+- Don't touch existing ADRs; amend ADR-11 (still "Proposed") if your design changes.
+
+### Delivery
+
+The same report format as pass 1, including a fresh "Decisions I made that this contract didn't cover" for this pass.
