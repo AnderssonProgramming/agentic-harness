@@ -20,7 +20,8 @@
     "test": "vitest run",
     "verify:chat": "node scripts/verify-chat.mjs",
     "verify:route": "node scripts/verify-route.mjs",
-    "verify:llm": "node scripts/verify-llm.mjs"
+    "verify:llm": "node scripts/verify-llm.mjs",
+    "context:profile": "node scripts/context-profile.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",
