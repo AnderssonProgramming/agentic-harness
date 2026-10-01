@@ -105,6 +105,10 @@ When `npm run check` (or a skill's verification) fails during an approved task, 
 
 This pre-approval covers defects only: type errors, typos, broken imports, and tests that fail because of a defect. **Stop and ask** if the fix would change behavior or scope, touch configuration or dependencies, disable a rule or a test, or if `check` still fails after 3 attempts. Then show me the full output of the last attempt.
 
+## Delegation contracts
+
+A file in `docs/delegations/` with `Status: approved` is a plan I have already approved, like a skill's `SKILL.md`. The agent it's delegated to (`.claude/agents/feature-builder.md`) doesn't wait for another approval. It writes its step table into the contract and executes. The contract's **Decisions** and **Limits** are part of it, just as binding as this file. Anything the contract doesn't cover is the agent's to decide only if it's not a product question, and it must be listed in the delivery report under "Decisions I made that this contract didn't cover".
+
 ## Available skills
 
 Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill, use the skill instead of doing the work by hand, and follow its steps exactly. Invoke it through the Skill tool **before** running any of its commands. Reading `SKILL.md` and running its commands yourself bypasses the skill's pre-approved tools. If a skill's steps don't fit the request, say so rather than improvising around them.
