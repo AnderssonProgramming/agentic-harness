@@ -77,6 +77,18 @@ When you need to know a library's API or types, do not try to open `node_modules
 8. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
 9. Update the item's `Status:` in BACKLOG.md when it changes.
 
+## Self-correction loop
+
+When `npm run check` (or a skill's verification) fails during an approved task, fixing it is part of the task. You don't need a new plan or my approval:
+
+1. **Read the complete output first.** Don't ask me where the error is, and don't guess from a summary.
+2. Find the cause in the code: the file and line the compiler or test names, and if needed `git log -p` for the commit that introduced it.
+3. Apply the smallest fix that restores the intended behavior, and add a test if no test caught the error.
+4. Run `npm run check` again. Repeat at most 3 times.
+5. Commit the fix on its own (`fix(<scope>): …`) before continuing, and list it in your report under "Fixed along the way", with the original error.
+
+This pre-approval covers defects only: type errors, typos, broken imports, and tests that fail because of a defect. **Stop and ask** if the fix would change behavior or scope, touch configuration or dependencies, disable a rule or a test, or if `check` still fails after 3 attempts. Then show me the full output of the last attempt.
+
 ## Available skills
 
 Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill, use the skill instead of doing the work by hand, and follow its steps exactly. Invoke it through the Skill tool **before** running any of its commands. Reading `SKILL.md` and running its commands yourself bypasses the skill's pre-approved tools. If a skill's steps don't fit the request, say so rather than improvising around them.
