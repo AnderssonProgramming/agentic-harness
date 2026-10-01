@@ -68,6 +68,19 @@ All ten criteria of **B-11** in BACKLOG.md. Report each one with its evidence (t
   - foreground checks (headless session)
 - **Stop and report** instead of continuing if a criterion can't be met within these limits.
 
+## Plan
+
+Written by the `feature-builder` subagent before the first code change. One commit per step, each after `npm run format` and `npm run -s check`.
+
+| #   | Step                                                                                                                                                                                                                                                                   | Files                                                                                                             | Criteria                                        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 1   | Protocol: the `action` event and `TodoAction` type, open to-dos in the request; the client sends them and reports actions. ADR-11 (proposed) + index row                                                                                                               | `src/shared/llm/protocol.ts`, `client.ts`, tests, `ARCHITECTURE.md`                                               | Engines, The model never claims success         |
+| 2   | Server: engines may yield actions; the handler forwards them and passes the to-dos; the mock maps the four phrases; the system prompt forbids claiming list changes                                                                                                    | `server/llm/engines/types.ts`, `mock.ts`, `handler.ts`, `history.ts`, `system-prompt.ts`, tests                   | Add, List, Complete, Engines (mock, Ollama)     |
+| 3   | Anthropic: declare the three tools with the open to-dos in the system prompt, turn a `tool_use` into an action                                                                                                                                                         | `server/llm/todo-tools.ts`, `engines/anthropic.ts`, tests                                                         | Engines (Anthropic)                             |
+| 4   | To-do feature: model (add, match, complete, list order), versioned snapshot, synchronous never-throwing store, an executor that writes then reads back and builds the card, the card component and CSS (pending → settled, no motion under reduced motion), `index.ts` | `src/features/todos/**`                                                                                           | Add, List, Complete, Honest failure, In-between |
+| 5   | Chat: `Message.action`, snapshot version 2 with a tested migration from 1, model text replaced by the card, history includes the card for the model, `useChat` runs the action after the stream ends, `ReplyBody` renders the card                                     | `src/features/chat/model/*`, `api/conversation-store.ts`, `hooks/use-chat.ts`, `components/reply-body.tsx`, tests | All except Evidence                             |
+| 6   | `npm run verify:todos`: headless Chrome, mock engine, reads storage through DevTools, restarts the browser; evidence file; backlog status                                                                                                                              | `scripts/verify-todos.mjs`, `package.json`, `docs/evidence/b-11-verification.md`, `BACKLOG.md`                    | Evidence, Survives a restart                    |
+
 ## How you deliver
 
 Commit as you go. Your final report must contain:
