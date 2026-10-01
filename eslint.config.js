@@ -46,6 +46,23 @@ export default tseslint.config(
     },
   },
   {
+    // ADR-07, B-08: storage is reached only through a feature's api/ layer.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/features/*/api/**'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'localStorage', message: "Use the feature's api/ layer (ADR-07)." },
+        { name: 'sessionStorage', message: "Use the feature's api/ layer (ADR-07)." },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { property: 'localStorage', message: "Use the feature's api/ layer (ADR-07)." },
+        { property: 'sessionStorage', message: "Use the feature's api/ layer (ADR-07)." },
+      ],
+    },
+  },
+  {
     files: ['vite.config.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
