@@ -21,6 +21,7 @@
     "verify:chat": "node scripts/verify-chat.mjs",
     "verify:route": "node scripts/verify-route.mjs",
     "verify:llm": "node scripts/verify-llm.mjs",
+    "verify:persistence": "node scripts/verify-persistence.mjs",
     "context:profile": "node scripts/context-profile.mjs"
   },
   "dependencies": {

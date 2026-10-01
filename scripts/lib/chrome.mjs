@@ -37,8 +37,11 @@ export async function startApp() {
   return { url, close: () => server.close() };
 }
 
-export async function openChrome({ width = 900, height = 700 } = {}) {
-  const profile = mkdtempSync(join(tmpdir(), 'compass-chrome-'));
+// Pass profileDir to keep the profile (and its storage) after close, e.g. to reopen it later.
+export async function openChrome({ width = 900, height = 700, profileDir } = {}) {
+  const profile = profileDir ?? mkdtempSync(join(tmpdir(), 'compass-chrome-'));
+  // A kept profile is reused, so a stale port file must not be mistaken for the new one.
+  rmSync(join(profile, 'DevToolsActivePort'), { force: true });
   // Port 0 lets Chrome pick a free port and write it to DevToolsActivePort, so runs can be parallel.
   const chrome = spawn(
     CHROME,
@@ -53,6 +56,7 @@ export async function openChrome({ width = 900, height = 700 } = {}) {
     { stdio: 'ignore' },
   );
   const spawnError = new Promise((_, reject) => chrome.once('error', reject));
+  const exited = new Promise((resolve) => chrome.once('exit', resolve));
 
   const port = await Promise.race([
     spawnError,
@@ -145,11 +149,16 @@ export async function openChrome({ width = 900, height = 700 } = {}) {
       const { data } = await send('Page.captureScreenshot', { format: 'png' });
       writeFileSync(path, Buffer.from(data, 'base64'));
     },
+    // A graceful exit, so Chrome flushes storage to the profile; kill() is only the fallback.
     close: async () => {
+      send('Browser.close').catch(() => {});
+      const graceful = await Promise.race([exited.then(() => true), sleep(10_000)]);
       ws.close();
-      chrome.kill();
-      await sleep(300);
-      rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+      if (!graceful) {
+        chrome.kill();
+        await sleep(300);
+      }
+      if (!profileDir) rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
     },
   };
 }
