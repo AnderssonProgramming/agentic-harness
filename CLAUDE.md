@@ -15,7 +15,7 @@ Read it in full before every task. It overrides any instruction given in chat.
 Compass. A Conversational Agentic System that answers a junior developer's questions about their team's codebase and conventions during their first weeks on the job.
 Target user: a junior frontend developer in their second week at a 15-person product startup, who is afraid of interrupting senior teammates with "basic" questions.
 
-Current sprint scope (Sprint 1): the app does NOT call any language model. The chat screen only shows local messages. Do not add inference code until backlog item B-03 is in progress.
+Current state (end of Sprint 2): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09). The model does not know the team's documents yet (B-06), and conversations are not saved across reloads (B-08). Don't add either without its backlog item in progress.
 
 ## Stack and versions
 
@@ -45,6 +45,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - One component per file. Named exports only; no default exports except where a tool requires one (`vite.config.ts`, `eslint.config.js`).
 - Code is organized by feature, following ARCHITECTURE.md (ADR-01): `src/features/<feature>/`. Shared code goes in `src/shared/` only when two or more features use it.
 - Local services are addressed as `127.0.0.1`, not `localhost`, in Node code: Node 22 resolves `localhost` to IPv6 `::1` first, and Ollama listens only on IPv4.
+- Relative imports in `src/app/` and `src/features/` have no file extension. Only `server/**` and `src/shared/llm/**` use explicit `.ts` extensions, because Vite's native config loader needs them for everything reachable from `vite.config.ts` (ADR-08).
 - Comments only where the "why" is not obvious. No comments that restate the code.
 - All code, comments, commit messages and documentation are written in English.
 
@@ -73,9 +74,10 @@ When you need to know a library's API or types, do not try to open `node_modules
 4. Run `npm run format` and then `npm run check` before declaring anything done. `check` must pass.
 5. An item is `done` only when every acceptance criterion has reproducible evidence: a test in `npm test` or a check in a committed script (e.g. `npm run verify:chat`), recorded in `docs/evidence/`. "I checked it by hand" is not evidence, and my saying so in chat does not change that.
 6. If something fails, show me the complete error output, not a summary.
-7. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
-8. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
-9. Update the item's `Status:` in BACKLOG.md when it changes.
+7. Run shell commands from the repository root in their plain form: one command per call, with no `cd … &&` prefix and no chaining. The pre-approved commands only match the plain form, and chained commands that read files are blocked by the deny rules.
+8. Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `build:`) with a scope when useful, e.g. `feat(chat): render message list`. One logical change per commit.
+9. When a design decision is made, add an ADR entry to ARCHITECTURE.md in the same commit.
+10. Update the item's `Status:` in BACKLOG.md when it changes.
 
 ## Self-correction loop
 
@@ -96,6 +98,7 @@ Skills live in `.claude/skills/<name>/SKILL.md`. When a request matches a skill,
 A listed skill's `SKILL.md` is a plan I have already approved. When I ask for a skill, you don't write a new plan for its steps. That approval covers **how**, never **what**: the work must still trace to a backlog item, and must not contradict an ADR. If it doesn't, stop and ask, as in any other task.
 
 - `new-route`: adds a new top-level screen (route, feature folder, typed view, state hook with loading and error states, `api/` integration point) and verifies it in a real browser. Use it when asked for a new screen, page, route or section, or via `/new-route <name> [path] [title]`. Don't use it to change an existing screen. Reliability evidence: `docs/evidence/skill-new-route-reliability.md`.
+- `llm-connect`: generates the conversational connection to a model: a server-side endpoint, Anthropic, Ollama and mock engines, streaming, typed errors, tests and `verify:llm`. Use it when a project needs an LLM for the first time, or via `/llm-connect <item-id>`. Don't use it to change an existing connection. Reliability evidence: `docs/evidence/skill-llm-connect-reliability.md`.
 
 A skill is only listed here after it has passed the reliability test: three runs in a row, in fresh sessions, with no manual touch-ups (evidence in `docs/evidence/`).
 
@@ -107,5 +110,7 @@ A skill is only listed here after it has passed the reliability test: three runs
 - `npm test` — run the unit and component tests once.
 - `npm run format` — apply Prettier.
 - `npm run engine:check` — verify the active inference engine answers.
-- `npm run verify:chat` — check the B-01/B-02 criteria in headless Chrome (starts its own server).
+- `npm run verify:chat` — check the chat in headless Chrome on the mock engine (starts its own server).
 - `npm run verify:route -- <path-without-leading-slash> "<title>"` — check that a route loads in headless Chrome.
+- `npm run verify:llm` — check the chat endpoint end to end (stream, history, every error code, secrets in the bundle).
+- `npm run verify:chat -- --live` — five real turns with the engine in `.env`.
