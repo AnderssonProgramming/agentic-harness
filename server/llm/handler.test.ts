@@ -64,6 +64,39 @@ describe('chat handler', () => {
     expect(reply).toContain('received 2 of your messages');
   });
 
+  it('forwards a to-do action as an action event, with no text (B-11)', async () => {
+    const url = await start({ env: () => mockEnv });
+    const events = await post(url, {
+      messages: [{ role: 'user', content: 'Mark the deploy one as done' }],
+      todos: [{ id: 't1', text: 'ask Ana how deploys work' }],
+    });
+    expect(events.map((e) => e.type)).toEqual(['start', 'action', 'done']);
+    expect(events[1]).toEqual({
+      type: 'action',
+      action: { kind: 'complete', id: null, query: 'the deploy one' },
+    });
+  });
+
+  it('passes the open to-dos to the engine, and rejects invalid ones (B-11)', async () => {
+    const seen: unknown[] = [];
+    const engine: Engine = {
+      name: 'mock',
+      model: 'spy',
+      async *stream({ todos }) {
+        seen.push(todos);
+        await Promise.resolve();
+        yield 'ok';
+      },
+    };
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const todos = [{ id: 't1', text: 'read the style guide' }];
+    await post(url, { ...hi, todos });
+    expect(seen).toEqual([todos]);
+
+    const events = await post(url, { ...hi, todos: [{ id: 1 }] });
+    expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'bad_request' } });
+  });
+
   it('answers malformed requests with a bad_request error event', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const url = await start({ env: () => mockEnv });

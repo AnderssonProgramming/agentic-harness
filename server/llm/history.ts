@@ -1,6 +1,15 @@
 import { chatError } from '../../src/shared/llm/errors.ts';
-import type { ChatTurn } from '../../src/shared/llm/protocol.ts';
+import { isTodoRef, type ChatTurn, type TodoRef } from '../../src/shared/llm/protocol.ts';
 import { isRecord } from './errors.ts';
+
+/** The open to-dos sent with the request (ADR-11). Missing means none; anything else invalid throws "bad_request". */
+export function parseTodoRefs(body: unknown): TodoRef[] {
+  if (!isRecord(body) || body.todos === undefined) return [];
+  if (!Array.isArray(body.todos) || !body.todos.every(isTodoRef)) {
+    throw chatError('bad_request', 'todos must be [{ id: string, text: string }]');
+  }
+  return body.todos.map(({ id, text }) => ({ id, text }));
+}
 
 /** Validates the request body and returns its messages. Throws "bad_request" otherwise. */
 export function parseChatRequest(body: unknown): ChatTurn[] {

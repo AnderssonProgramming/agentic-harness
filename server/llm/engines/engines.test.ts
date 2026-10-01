@@ -4,13 +4,14 @@ import { isChatError } from '../../../src/shared/llm/errors.ts';
 import type { ChatErrorCode } from '../../../src/shared/llm/protocol.ts';
 import { IDLE_TIMEOUT } from '../errors.ts';
 import { anthropicEngine } from './anthropic.ts';
-import { mockEngine } from './mock.ts';
+import { mockEngine, mockIntent } from './mock.ts';
 import { ollamaEngine } from './ollama.ts';
-import type { Engine, FetchLike } from './types.ts';
+import type { Engine, EngineChunk, FetchLike } from './types.ts';
 
 const input = (signal = new AbortController().signal) => ({
   system: 'Be brief.',
   messages: [{ role: 'user' as const, content: 'Hi' }],
+  todos: [],
   signal,
 });
 
@@ -31,8 +32,15 @@ function respond(body: string, status = 200, { close = true } = {}): FetchLike {
 
 async function collect(engine: Engine, signal?: AbortSignal): Promise<string> {
   let text = '';
-  for await (const chunk of engine.stream(input(signal))) text += chunk;
+  for await (const chunk of engine.stream(input(signal)))
+    if (typeof chunk === 'string') text += chunk;
   return text;
+}
+
+async function all(stream: AsyncGenerator<EngineChunk>): Promise<EngineChunk[]> {
+  const chunks: EngineChunk[] = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return chunks;
 }
 
 async function errorCode(promise: Promise<unknown>): Promise<ChatErrorCode> {
@@ -171,9 +179,10 @@ describe('mockEngine', () => {
         { role: 'assistant', content: 'Hi Ada' },
         { role: 'user', content: 'What is my name?' },
       ],
+      todos: [],
       signal: new AbortController().signal,
     })) {
-      text += chunk;
+      if (typeof chunk === 'string') text += chunk;
     }
     expect(text).toContain('You said: "What is my name?"');
     expect(text).toContain('received 2 of your messages');
@@ -192,7 +201,7 @@ describe('mockEngine', () => {
       ...input(),
       messages: [{ role: 'user', content: 'Hello [mock:auth]\n\nA new question' }],
     })) {
-      text += chunk;
+      if (typeof chunk === 'string') text += chunk;
     }
     expect(text).toContain('A new question');
   });
@@ -204,5 +213,64 @@ describe('mockEngine', () => {
       messages: [{ role: 'user', content: 'x [mock:quota]' }],
     });
     expect(await errorCode(run.next())).toBe('quota');
+  });
+
+  it('yields only the to-do action for a to-do phrase, and nothing else (B-11)', async () => {
+    const chunks = await all(
+      mockEngine({ delayMs: 0 }).stream({
+        ...input(),
+        messages: [{ role: 'user', content: 'Remind me to ask Ana how deploys work.' }],
+      }),
+    );
+    expect(chunks).toEqual([{ kind: 'add', text: 'ask Ana how deploys work' }]);
+  });
+});
+
+describe('mockIntent (B-11)', () => {
+  it.each([
+    ['Remind me to ask Ana how deploys work', { kind: 'add', text: 'ask Ana how deploys work' }],
+    ['remind me to read the style guide!', { kind: 'add', text: 'read the style guide' }],
+    ['Add set up the VPN to my list', { kind: 'add', text: 'set up the VPN' }],
+    ['add pair with Bo to my to-do list.', { kind: 'add', text: 'pair with Bo' }],
+    ["What's on my list?", { kind: 'list' }],
+    ['whats on my todo list', { kind: 'list' }],
+    ['Mark the deploy one as done', { kind: 'complete', id: null, query: 'the deploy one' }],
+    ['Remind me to ask Bo about tests [mock:slow]', { kind: 'add', text: 'ask Bo about tests' }],
+  ])('maps "%s"', (message, action) => {
+    expect(mockIntent(message)).toEqual(action);
+  });
+
+  it.each([
+    'How do we name branches?',
+    'Can you remind me how deploys work?',
+    'What is on the menu?',
+    'Mark my words',
+  ])('leaves "%s" as an ordinary message', (message) => {
+    expect(mockIntent(message)).toBeNull();
+  });
+});
+
+describe('ollamaEngine and to-dos (B-11)', () => {
+  it('declares no tools, sends no to-dos, and yields only text for a to-do phrase', async () => {
+    const fetchImpl = respond(
+      [
+        JSON.stringify({ message: { content: 'I cannot manage your list.' } }),
+        '{"done":true}',
+      ].join('\n'),
+    );
+    const chunks = await all(
+      ollamaEngine({ baseUrl: 'http://127.0.0.1:11434/', model: 'phi3', fetchImpl }).stream({
+        ...input(),
+        messages: [{ role: 'user', content: 'Remind me to ask Ana how deploys work' }],
+        todos: [{ id: 't1', text: 'read the style guide' }],
+      }),
+    );
+    expect(chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
+    const body = JSON.parse(vi.mocked(fetchImpl).mock.calls[0][1].body as string) as Record<
+      string,
+      unknown
+    >;
+    expect(body).not.toHaveProperty('tools');
+    expect(JSON.stringify(body)).not.toContain('read the style guide');
   });
 });

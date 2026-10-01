@@ -5,7 +5,7 @@ import { LLM_CONFIG } from './config.ts';
 import { selectEngine, type Env } from './engine.ts';
 import type { Engine } from './engines/types.ts';
 import { IDLE_TIMEOUT } from './errors.ts';
-import { parseChatRequest, trimHistory } from './history.ts';
+import { parseChatRequest, parseTodoRefs, trimHistory } from './history.ts';
 import { SYSTEM_PROMPT } from './system-prompt.ts';
 
 interface ChatHandlerOptions {
@@ -71,21 +71,25 @@ export function createChatHandler({
 
     let engineName: string | null = null;
     try {
-      const messages = trimHistory(
-        parseChatRequest(await readJsonBody(req, LLM_CONFIG.maxRequestBytes)),
-        LLM_CONFIG.historyChars,
-      );
+      const body = await readJsonBody(req, LLM_CONFIG.maxRequestBytes);
+      const messages = trimHistory(parseChatRequest(body), LLM_CONFIG.historyChars);
+      const todos = parseTodoRefs(body);
       const engine = engineFor(env());
       engineName = engine.name;
       send({ type: 'start', engine: engine.name, model: engine.model });
       restartIdleTimer();
-      for await (const text of engine.stream({
+      for await (const chunk of engine.stream({
         system: SYSTEM_PROMPT,
         messages,
+        todos,
         signal: upstream.signal,
       })) {
         restartIdleTimer();
-        send({ type: 'delta', text });
+        send(
+          typeof chunk === 'string'
+            ? { type: 'delta', text: chunk }
+            : { type: 'action', action: chunk },
+        );
       }
       send({ type: 'done' });
     } catch (error) {
