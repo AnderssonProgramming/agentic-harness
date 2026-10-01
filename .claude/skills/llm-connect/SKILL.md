@@ -2,7 +2,7 @@
 name: llm-connect
 description: Generates the conversational connection to a language model for a Vite + TypeScript app. It adds a server-side chat endpoint mounted in Vite (API keys never reach the browser), engine adapters for Anthropic, Ollama and a deterministic mock, streaming as NDJSON, history trimming, a typed browser client (streamChat) that maps every network and API failure to an error code with a user-facing message, tests, and an end-to-end check. Use when a project needs to talk to an LLM for the first time, e.g. "connect the app to the model", "generate the LLM client", "add the chat endpoint", or "/llm-connect". Do NOT use to wire the client into a screen (that's feature work with a plan), to update or extend an existing connection, or to add another provider.
 argument-hint: "<backlog item ID>" [--route api/chat] [--default-engine anthropic|ollama|mock]
-allowed-tools: Read, Grep, Glob, Bash(node .claude/skills/llm-connect/scaffold.mjs:*), Bash(npm run format), Bash(npm run check), Bash(npm run verify:llm), Bash(git status:*)
+allowed-tools: Read, Grep, Glob, Bash(node .claude/skills/llm-connect/scaffold.mjs:*), Bash(npm run format), Bash(npm run check), Bash(npm run verify:llm), Bash(git status:*), Bash(git check-ignore:*)
 ---
 
 # llm-connect

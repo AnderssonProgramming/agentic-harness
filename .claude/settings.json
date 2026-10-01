@@ -12,7 +12,8 @@
       "Bash(git status:*)",
       "Skill(llm-connect)",
       "Bash(node .claude/skills/llm-connect/scaffold.mjs:*)",
-      "Bash(npm run verify:llm)"
+      "Bash(npm run verify:llm)",
+      "Bash(git check-ignore:*)"
     ],
     "deny": [
       "Read(./node_modules/**)",
