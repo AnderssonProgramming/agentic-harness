@@ -38,7 +38,10 @@ export function mockEngine({ delayMs }: MockOptions): Engine {
     model: 'echo',
     async *stream({ messages, signal }) {
       const last = messages.at(-1)?.content ?? '';
-      const injected = /\[mock:([a-z_]+)\]/.exec(last)?.[1];
+      // Only the newest message counts: after a failed reply, the server merges the next message
+      // into the unanswered one with a blank line, and old markers must not fire again.
+      const newest = last.split('\n\n').at(-1) ?? '';
+      const injected = /\[mock:([a-z_]+)\]/.exec(newest)?.[1];
       if (injected && injected !== 'slow') {
         if (!isChatErrorCode(injected))
           throw chatError('bad_request', `Unknown mock error: ${injected}`, 'mock');

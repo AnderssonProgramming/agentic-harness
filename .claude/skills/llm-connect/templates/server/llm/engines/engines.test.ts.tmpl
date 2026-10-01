@@ -179,6 +179,24 @@ describe('mockEngine', () => {
     expect(text).toContain('received 2 of your messages');
   });
 
+  it('only honours a marker in the newest message of a merged turn', async () => {
+    const engine = mockEngine({ delayMs: 0 });
+    const failing = engine.stream({
+      ...input(),
+      messages: [{ role: 'user', content: 'Hello [mock:rate_limit]\n\nHello [mock:auth]' }],
+    });
+    expect(await errorCode(failing.next())).toBe('auth');
+
+    let text = '';
+    for await (const chunk of engine.stream({
+      ...input(),
+      messages: [{ role: 'user', content: 'Hello [mock:auth]\n\nA new question' }],
+    })) {
+      text += chunk;
+    }
+    expect(text).toContain('A new question');
+  });
+
   it('simulates any error code on request', async () => {
     const engine = mockEngine({ delayMs: 0 });
     const run = engine.stream({
