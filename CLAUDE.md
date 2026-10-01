@@ -15,7 +15,7 @@ Read it in full before every task. It overrides any instruction given in chat.
 Compass. A Conversational Agentic System that answers a junior developer's questions about their team's codebase and conventions during their first weeks on the job.
 Target user: a junior frontend developer in their second week at a 15-person product startup, who is afraid of interrupting senior teammates with "basic" questions.
 
-Current state (end of Sprint 2): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09). The model does not know the team's documents yet (B-06), and conversations are not saved across reloads (B-08). Don't add either without its backlog item in progress.
+Current state (Sprint 3, week 5): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09), and the conversation is saved in the browser and restored after closing it (B-08, ADR-10). The model does not know the team's documents yet (B-06). Don't add that without its backlog item in progress.
 
 ## Stack and versions
 
