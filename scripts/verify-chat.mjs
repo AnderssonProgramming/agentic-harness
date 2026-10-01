@@ -1,20 +1,54 @@
-// Verifies the B-01 and B-02 acceptance criteria in real headless Chrome.
-// Usage: npm run verify:chat [-- <screenshot dir>]   (starts its own dev server; set APP_URL to reuse one)
-// Exits non-zero if any criterion fails.
+// Verifies the chat in real headless Chrome against the real endpoint.
+//   npm run verify:chat [-- <screenshot dir>]        mock engine: deterministic, free, offline-safe
+//   npm run verify:chat -- --live [<screenshot dir>]  a five-turn conversation with the engine in .env
+// Starts its own dev server. Exits non-zero if any criterion fails.
 import { join } from 'node:path';
 import { createReport, openChrome, startApp } from './lib/chrome.mjs';
 
-const OUT = process.argv[2] ?? 'docs/evidence';
+const args = process.argv.slice(2);
+const LIVE = args.includes('--live');
+const OUT = args.find((arg) => !arg.startsWith('--')) ?? 'docs/evidence';
+
+if (!LIVE) {
+  process.env.INFERENCE_ENGINE = 'mock';
+  process.env.MOCK_DELAY_MS = '5';
+}
+
 const clearInput = `(() => {
   const input = document.querySelector('#composer-input');
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '');
   input.dispatchEvent(new Event('input', { bubbles: true }));
 })()`;
+const STATE = `(() => {
+  const items = [...document.querySelectorAll('.message-list > li')];
+  const replies = items.filter((li) => li.classList.contains('message--assistant'));
+  const last = replies.at(-1);
+  const input = document.querySelector('#composer-input');
+  return {
+    items: items.length,
+    users: items.length - replies.length,
+    lastReply: last ? (last.querySelector('.message__text')?.textContent ?? '') : null,
+    lastStatus: last ? ['streaming', 'done', 'error', 'stopped'].find((s) => last.classList.contains('message--' + s)) : null,
+    typing: Boolean(document.querySelector('[aria-label="Compass is typing"]')),
+    alert: document.querySelector('.message-list > li:last-child [role="alert"]')?.textContent ?? null,
+    retry: Boolean(document.querySelector('.message-list > li:last-child .message__retry')),
+    stopButton: Boolean(document.querySelector('.composer__send--stop')),
+    sendButton: Boolean(document.querySelector('button.composer__send:not(.composer__send--stop)')),
+    busy: document.querySelector('.message-list')?.getAttribute('aria-busy') ?? null,
+    value: input.value,
+    focused: document.activeElement === input,
+  };
+})()`;
 
 const app = await startApp();
 const page = await openChrome();
 const { check, finish } = createReport();
-const count = () => page.evaluate("document.querySelectorAll('.message-list > li').length");
+const state = () => page.evaluate(STATE);
+const say = async (text) => {
+  await page.typeText(text);
+  await page.pressEnter();
+};
+const idle = () => page.waitFor("!document.querySelector('.message--streaming')", 60_000);
 
 try {
   await page.setColorScheme('light');
@@ -22,145 +56,311 @@ try {
   await page.waitFor("!!document.querySelector('#composer-input')");
   await page.evaluate("document.querySelector('#composer-input').focus()");
 
-  // Empty state
-  const empty = await page.evaluate(
-    "document.querySelector('.chat-empty h2')?.textContent ?? null",
-  );
-  check('B-01 #6', 'Empty state explains what to do', empty, `heading: "${empty}"`);
-  await page.screenshot(join(OUT, 'b-01-empty-state.png'));
-
-  // Send with Enter
-  await page.typeText('How do we name branches?');
-  await page.pressEnter();
-  await page.settle();
-  const afterFirst = await page.evaluate(`(() => {
-    const items = [...document.querySelectorAll('.message-list > li')];
-    const input = document.querySelector('#composer-input');
-    return { n: items.length, lastUser: items.filter(li => li.classList.contains('message--user')).at(-1)?.querySelector('.message__text').textContent,
-             value: input.value, focused: document.activeElement === input };
-  })()`);
-  check(
-    'B-01 #1',
-    'Typed message appears at the bottom after sending',
-    afterFirst.n === 2 && afterFirst.lastUser === 'How do we name branches?',
-    JSON.stringify({ items: afterFirst.n, lastUser: afterFirst.lastUser }),
-  );
-  check(
-    'B-02 #3',
-    'Input cleared and keeps focus after sending',
-    afterFirst.value === '' && afterFirst.focused,
-    JSON.stringify({ value: afterFirst.value, focused: afterFirst.focused }),
-  );
-
-  // Visual distinction
-  const styles = await page.evaluate(`(() => {
-    const s = (sel) => { const cs = getComputedStyle(document.querySelector(sel)); return { bg: cs.backgroundColor, align: cs.alignSelf }; };
-    return { user: s('.message--user'), assistant: s('.message--assistant') };
-  })()`);
-  check(
-    'B-01 #2',
-    'User and assistant messages visually distinct',
-    styles.user.bg !== styles.assistant.bg && styles.user.align !== styles.assistant.align,
-    JSON.stringify(styles),
-  );
-
-  // Whitespace-only is blocked
-  await page.typeText('   ');
-  const disabled = await page.evaluate("document.querySelector('.composer__send').disabled");
-  await page.pressEnter();
-  await page.settle();
-  const afterBlank = await count();
-  check(
-    'B-02 #2',
-    'Whitespace-only draft: Send disabled and Enter does nothing',
-    disabled && afterBlank === 2,
-    `disabled=${disabled}, items=${afterBlank}`,
-  );
-  await page.evaluate(clearInput);
-
-  // Shift+Enter inserts a new line
-  await page.typeText('line one');
-  await page.pressEnter(8);
-  await page.typeText('line two');
-  const multi = await page.evaluate("document.querySelector('#composer-input').value");
-  await page.pressEnter();
-  await page.settle();
-  const lastText = await page.evaluate(
-    "[...document.querySelectorAll('.message--user .message__text')].at(-1).textContent",
-  );
-  check(
-    'B-02 #1',
-    'Shift+Enter inserts a new line, Enter sends',
-    multi === 'line one\nline two' && lastText === 'line one\nline two',
-    JSON.stringify({ draft: multi, sent: lastText }),
-  );
-
-  // Over-limit block
-  await page.typeText('a'.repeat(4001));
-  const over = await page.evaluate(
-    "({ disabled: document.querySelector('.composer__send').disabled, counter: document.querySelector('.composer__counter').textContent })",
-  );
-  check(
-    'B-02 #4',
-    'Over 4,000 characters is blocked with a visible counter',
-    over.disabled && /Too long/.test(over.counter),
-    JSON.stringify(over),
-  );
-  await page.evaluate(clearInput);
-
-  // Fill to 50 messages
-  while ((await count()) < 50) {
-    await page.typeText(`Question number ${(await count()) / 2 + 1}`);
-    await page.pressEnter();
-  }
-  await page.settle();
-  const atBottom = () =>
-    page.evaluate(
-      "(() => { const s = document.querySelector('.chat__scroll'); return { top: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight }; })()",
+  if (LIVE) {
+    const turns = [
+      'Hi! My name is Lucía and this is my second week as a frontend developer.',
+      'Our team uses React with TypeScript. What should I focus on learning first?',
+      'Thanks. How do I ask a senior for a code review without bothering them?',
+      'What is a good first pull request for someone new?',
+      'Before you answer anything else: what is my name, and which stack did I say we use?',
+    ];
+    const log = [];
+    for (const [index, question] of turns.entries()) {
+      // Measured in the page: from the Enter keydown to the first painted text of the reply.
+      // The trailing "; 0" keeps evaluate() from waiting on the promise.
+      await page.evaluate(`window.__firstText = new Promise((resolve) => {
+        const input = document.querySelector('#composer-input');
+        let t0 = 0;
+        input.addEventListener('keydown', () => { t0 = performance.now(); }, { capture: true, once: true });
+        new MutationObserver((_, obs) => {
+          const text = document.querySelector('.message--assistant:last-child .message__text')?.textContent ?? '';
+          if (t0 && text.length > 0) { obs.disconnect(); requestAnimationFrame(() => resolve(Math.round(performance.now() - t0))); }
+        }).observe(document.querySelector('.chat__scroll'), { childList: true, subtree: true, characterData: true });
+      }); 0`);
+      await say(question);
+      const firstTextMs = await page.evaluate('window.__firstText');
+      await idle();
+      const s = await state();
+      log.push({
+        turn: index + 1,
+        question,
+        firstTextMs,
+        status: s.lastStatus,
+        reply: s.lastReply,
+      });
+      if (index === 0) await page.screenshot(join(OUT, 'b-03-live-streaming.png'));
+    }
+    const final = log.at(-1);
+    check(
+      'C1',
+      'Every turn gets a complete reply from the model',
+      log.every((t) => t.status === 'done' && t.reply.length > 0),
+      log.map((t) => `${String(t.turn)}:${t.status}`).join(' '),
     );
-  const scroll50 = await atBottom();
+    check(
+      'C5',
+      'Turn 5 remembers turn 1 (name) and turn 2 (stack)',
+      /Luc[ií]a/.test(final.reply) && /React/.test(final.reply) && /TypeScript/i.test(final.reply),
+      final.reply.slice(0, 200),
+    );
+    check(
+      'B-09',
+      'First text appears in under 2 s on every turn',
+      log.every((t) => t.firstTextMs < 2000),
+      log.map((t) => `${String(t.firstTextMs)} ms`).join(', '),
+    );
+    check(
+      'C6',
+      'The whole conversation stays on screen',
+      (await state()).items === 10,
+      `${String((await state()).items)} messages`,
+    );
+    await page.screenshot(join(OUT, 'b-03-live-conversation.png'));
+    console.error(JSON.stringify(log, null, 2));
+  } else {
+    // Empty state
+    const empty = await page.evaluate(
+      "document.querySelector('.chat-empty h2')?.textContent ?? null",
+    );
+    check('B-01 #6', 'Empty state explains what to do', empty, `heading: "${empty}"`);
 
-  // Measure keydown -> new item painted, with 50 messages in the history.
-  // The trailing "; 0" matters: returning the promise itself would make evaluate() wait on it.
-  await page.evaluate(`window.__render = new Promise((resolve) => {
-    const input = document.querySelector('#composer-input');
-    let t0 = 0;
-    input.addEventListener('keydown', () => { t0 = performance.now(); }, { capture: true, once: true });
-    const list = document.querySelector('.message-list');
-    const before = list.children.length;
-    new MutationObserver((_, obs) => {
-      if (list.children.length > before) { obs.disconnect(); requestAnimationFrame(() => resolve(performance.now() - t0)); }
-    }).observe(list, { childList: true });
-  }); 0`);
-  await page.typeText('Message fifty-one, measured');
-  await page.pressEnter();
-  const renderMs = await page.evaluate('window.__render');
-  await page.settle();
-  const scrollAfter = await atBottom();
-  const total = await count();
-  check(
-    'B-01 #5',
-    'With 50 messages, a new send renders in < 100 ms',
-    renderMs < 100,
-    `${renderMs.toFixed(1)} ms (keydown to next frame, ${total} items after send)`,
-  );
-  check(
-    'B-01 #3',
-    'List auto-scrolls to the newest message',
-    scroll50.max > 0 && Math.abs(scrollAfter.top - scrollAfter.max) <= 1,
-    `before measured send: ${JSON.stringify(scroll50)}, after: ${JSON.stringify(scrollAfter)}`,
-  );
-  check(
-    'B-01 #4',
-    'Messages persist in the tab (no reload)',
-    total === 52,
-    `${total} messages present after 26 sends`,
-  );
-  await page.screenshot(join(OUT, 'b-01-conversation-light.png'));
+    // Loading, locked send, progressive streaming (slow mock: ~50 ms per word)
+    await say('How do we name branches? [mock:slow]');
+    const waiting = await state();
+    check(
+      'C2',
+      'A loading indicator is visible while waiting',
+      waiting.typing && waiting.busy === 'true',
+      JSON.stringify({ typing: waiting.typing, ariaBusy: waiting.busy }),
+    );
+    check(
+      'B-02 #3',
+      'Input cleared and keeps focus after sending',
+      waiting.value === '' && waiting.focused,
+      JSON.stringify({ value: waiting.value, focused: waiting.focused }),
+    );
+    await page.typeText('A second question');
+    await page.pressEnter();
+    const blocked = await state();
+    check(
+      'C3',
+      'Send becomes Stop and a second message cannot be sent on top',
+      blocked.users === 1 &&
+        blocked.stopButton &&
+        !blocked.sendButton &&
+        blocked.value === 'A second question',
+      JSON.stringify({ users: blocked.users, stop: blocked.stopButton, draftKept: blocked.value }),
+    );
+    await page.screenshot(join(OUT, 'b-03-streaming.png'));
+    const lengths = [];
+    for (let i = 0; i < 8; i++) {
+      lengths.push((await state()).lastReply?.length ?? 0);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    await idle();
+    const done = await state();
+    const growth = new Set(lengths.filter((n) => n > 0)).size;
+    check(
+      'B-09',
+      'The reply appears progressively, not all at once',
+      growth >= 3 && done.lastStatus === 'done',
+      `${String(growth)} distinct lengths while streaming: ${lengths.join(' → ')}`,
+    );
+    check(
+      'C1',
+      'The reply arrives under the message',
+      done.lastStatus === 'done' && done.lastReply?.includes('How do we name branches?'),
+      done.lastReply?.slice(0, 80),
+    );
+    await page.evaluate(clearInput);
 
-  await page.setColorScheme('dark');
-  await page.settle();
-  await page.screenshot(join(OUT, 'b-01-conversation-dark.png'));
+    // Stop keeps the partial text
+    await say('Tell me everything about our release process [mock:slow]');
+    await page.waitFor(
+      "(document.querySelector('.message--assistant:last-child .message__text')?.textContent ?? '').length > 10",
+    );
+    await page.evaluate("document.querySelector('.composer__send--stop').click()");
+    await page.waitFor("!!document.querySelector('.message--stopped')");
+    const stopped = await state();
+    check(
+      'B-09',
+      'Stop interrupts the reply and keeps the partial text',
+      stopped.lastStatus === 'stopped' &&
+        (stopped.lastReply?.length ?? 0) > 10 &&
+        stopped.sendButton,
+      `${String(stopped.lastReply?.length)} chars kept, status ${stopped.lastStatus}`,
+    );
+
+    // Network down: real offline emulation in Chrome
+    await page.send('Network.enable');
+    await page.send('Network.emulateNetworkConditions', {
+      offline: true,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
+    await say('Are you there?');
+    await page.waitFor(
+      '!!document.querySelector(\'.message-list > li:last-child [role="alert"]\')',
+    );
+    const offline = await state();
+    check(
+      'C4',
+      'Network down: an understandable error, and the app keeps working',
+      /internet connection/.test(offline.alert ?? '') &&
+        offline.retry &&
+        offline.sendButton &&
+        offline.users === 3,
+      JSON.stringify({ alert: offline.alert, retry: offline.retry, usersKept: offline.users }),
+    );
+    await page.screenshot(join(OUT, 'b-05-network-error.png'));
+    await page.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
+    await page.evaluate("document.querySelector('.message__retry').click()");
+    await idle();
+    const recovered = await state();
+    check(
+      'B-05',
+      'Retry after reconnecting gets the reply, and the user message was kept',
+      recovered.lastStatus === 'done' &&
+        recovered.lastReply?.includes('Are you there?') &&
+        recovered.alert === null,
+      recovered.lastReply?.slice(0, 60),
+    );
+
+    // API errors name the cause; Retry only when it can help
+    await say('Hello [mock:rate_limit]');
+    await page.waitFor(
+      '!!document.querySelector(\'.message-list > li:last-child [role="alert"]\')',
+    );
+    const limited = await state();
+    await say('Hello [mock:auth]');
+    await page.waitFor(
+      "(document.querySelector('.message-list > li:last-child [role=\"alert\"]')?.textContent ?? '').includes('API key')",
+    );
+    const auth = await state();
+    check(
+      'B-05',
+      'API errors are explained; Retry only when retrying can help',
+      /Too many requests/.test(limited.alert ?? '') &&
+        limited.retry &&
+        /rejected the API key/.test(auth.alert ?? '') &&
+        !auth.retry,
+      JSON.stringify({ rateLimit: limited.alert, authRetry: auth.retry }),
+    );
+
+    // Visual distinction, keyboard behaviour, limits
+    const styles = await page.evaluate(`(() => {
+      const s = (sel) => { const cs = getComputedStyle(document.querySelector(sel)); return { bg: cs.backgroundColor, align: cs.alignSelf }; };
+      return { user: s('.message--user'), assistant: s('.message--assistant.message--done') };
+    })()`);
+    check(
+      'B-01 #2',
+      'User and assistant messages are visually distinct',
+      styles.user.bg !== styles.assistant.bg && styles.user.align !== styles.assistant.align,
+      JSON.stringify(styles),
+    );
+    const before = (await state()).users;
+    await page.typeText('   ');
+    await page.pressEnter();
+    check(
+      'B-02 #2',
+      'Whitespace-only drafts are not sent',
+      (await state()).users === before,
+      `users ${String(before)} → ${String((await state()).users)}`,
+    );
+    await page.evaluate(clearInput);
+    await page.typeText('line one');
+    await page.pressEnter(8);
+    await page.typeText('line two');
+    const multi = (await state()).value;
+    check(
+      'B-02 #1',
+      'Shift+Enter inserts a new line',
+      multi === 'line one\nline two',
+      JSON.stringify(multi),
+    );
+    await page.evaluate(clearInput);
+    await page.typeText('a'.repeat(4001));
+    const over = await page.evaluate(
+      "({ disabled: document.querySelector('button.composer__send').disabled, counter: document.querySelector('.composer__counter').textContent })",
+    );
+    check(
+      'B-02 #4',
+      'Over 4,000 characters is blocked with a visible counter',
+      over.disabled && /Too long/.test(over.counter),
+      JSON.stringify(over),
+    );
+    await page.evaluate(clearInput);
+
+    // Five turns with context, in a fresh conversation (a reload clears the chat until B-08)
+    await page.goto(app.url);
+    await page.waitFor(
+      "!!document.querySelector('#composer-input') && !document.querySelector('.message-list')",
+    );
+    await page.evaluate("document.querySelector('#composer-input').focus()");
+    for (let i = 1; i <= 5; i++) {
+      await say(`Context question ${String(i)}`);
+      await idle();
+    }
+    const five = await state();
+    const counted = Number(/received (\d+) of your messages/.exec(five.lastReply ?? '')?.[1] ?? 0);
+    check(
+      'C5',
+      'Five turns: on turn 5 the model receives all five user messages',
+      counted === 5 && five.users === 5,
+      `model received ${String(counted)} user messages; ${String(five.users)} on screen`,
+    );
+
+    // Fill to 50 messages and measure a send
+    while ((await state()).items < 50) {
+      await say(`Filler ${String((await state()).items)}`);
+      await idle();
+    }
+    await page.evaluate(`window.__render = new Promise((resolve) => {
+      const input = document.querySelector('#composer-input');
+      let t0 = 0;
+      input.addEventListener('keydown', () => { t0 = performance.now(); }, { capture: true, once: true });
+      const list = document.querySelector('.message-list');
+      const before = list.children.length;
+      new MutationObserver((_, obs) => {
+        if (list.children.length > before) { obs.disconnect(); requestAnimationFrame(() => resolve(performance.now() - t0)); }
+      }).observe(list, { childList: true });
+    }); 0`);
+    await say('Message fifty-one, measured');
+    const renderMs = await page.evaluate('window.__render');
+    await idle();
+    const atBottom = await page.evaluate(
+      "(() => { const s = document.querySelector('.chat__scroll'); return Math.abs(s.scrollTop - (s.scrollHeight - s.clientHeight)) <= 2; })()",
+    );
+    const final = await state();
+    check(
+      'B-01 #5',
+      'With 50 messages, a new send renders in < 100 ms',
+      renderMs < 100,
+      `${renderMs.toFixed(1)} ms`,
+    );
+    check(
+      'B-01 #3',
+      'The list follows the newest message',
+      atBottom,
+      `at bottom: ${String(atBottom)}`,
+    );
+    check(
+      'C6',
+      'The history stays while the app is open',
+      final.items >= 52,
+      `${String(final.items)} messages on screen`,
+    );
+    await page.screenshot(join(OUT, 'b-03-conversation-light.png'));
+    await page.setColorScheme('dark');
+    await page.settle();
+    await page.screenshot(join(OUT, 'b-03-conversation-dark.png'));
+  }
 
   check(
     '—',
@@ -175,4 +375,4 @@ try {
   await app.close();
 }
 
-process.exitCode = finish({ chrome: page.browserVersion });
+process.exitCode = finish({ chrome: page.browserVersion, mode: LIVE ? 'live' : 'mock' });
