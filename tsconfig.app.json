@@ -8,6 +8,7 @@
     "types": ["vite/client", "@testing-library/jest-dom/vitest"],
     "jsx": "react-jsx",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,

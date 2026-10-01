@@ -21,7 +21,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.{ts,tsx}', 'vite.config.ts'],
+    files: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'vite.config.ts'],
     extends: [...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       globals: globals.browser,

@@ -19,7 +19,8 @@
     "engine:check": "node --env-file-if-exists=.env scripts/check-engine.mjs",
     "test": "vitest run",
     "verify:chat": "node scripts/verify-chat.mjs",
-    "verify:route": "node scripts/verify-route.mjs"
+    "verify:route": "node scripts/verify-route.mjs",
+    "verify:llm": "node scripts/verify-llm.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",
