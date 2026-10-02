@@ -187,6 +187,14 @@ Rejected alternatives:
 - Parsing intent in the browser with regular expressions for every engine: rejected by the contract (the model recognizes intent); the regexes exist only in the mock.
 - One event type per action: rejected because the contract allows exactly one new event type.
 
+Amendment 1 (2026-10-01, B-11 contract Amendment 1, still **Proposed**). A system prompt doesn't stop a small local model (`phi3`) from claiming it saved a to-do, so:
+
+- **Capability, not instructions.** Each engine declares `actions` (Anthropic and the mock: true; Ollama, and the mock with `MOCK_TOOLS=off`: false). The `start` event carries it, and `GET /api/engine` returns `{ engine, model, actions }` (503 with the error on a bad configuration) so the browser knows before the first message. `/api/chat` keeps answering only POST.
+- **To-do phrases never reach an engine without actions.** The known phrases ("remind me to …", "add … to my list", "what's on my list", "mark … as done") live in `src/shared/llm/todo-phrases.ts`, one action per sentence or line. When the engine has no actions and the last user turn contains one, the handler sends `start` and `done` without calling the model, and the browser replies with an app card per phrase: not done, and why. Nothing stored changes. Other wording reaches the model as before. This is matching in order to **refuse**, never to run: the rejected alternative above still holds.
+- **Standing notice.** While the engine can't run actions, the chat shows that Compass can't change the to-do list with it and that saved to-dos are safe. It goes away when an engine with actions answers.
+- **Unreadable to-do data** is still removed, and the chat says so once, like an unreadable conversation (B-08).
+- **Several actions per reply.** Anthropic allows parallel tool use; every `tool_use`, and every to-do sentence for the mock, becomes an action event in order. The browser runs them in that order after `done`, each with its own card. The conversation snapshot moves to version 3: `action` becomes `actions` (a list), with a migration from version 2.
+
 ## Inference engine
 
 This section documents the engine switch for both the development harness (the agent) and the app.

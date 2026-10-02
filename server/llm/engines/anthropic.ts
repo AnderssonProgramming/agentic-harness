@@ -29,6 +29,7 @@ export function anthropicEngine({
   return {
     name: 'anthropic',
     model,
+    actions: true,
     async *stream({ system, messages, todos, signal }) {
       let response: Response;
       try {

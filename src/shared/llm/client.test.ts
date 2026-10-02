@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { streamChat } from './client.ts';
+import { fetchEngineInfo, streamChat } from './client.ts';
 import { isChatError, type ChatError } from './errors.ts';
 import type { StreamEvent } from './protocol.ts';
 
@@ -42,11 +42,30 @@ afterEach(() => {
 
 const history = [{ role: 'user' as const, content: 'Hi' }];
 
+describe('fetchEngineInfo (B-11)', () => {
+  it('returns the engine and whether it can run actions', async () => {
+    const fetchMock = mockFetch(
+      new Response(JSON.stringify({ engine: 'ollama', model: 'phi3', actions: false, extra: 1 })),
+    );
+    expect(await fetchEngineInfo()).toEqual({ engine: 'ollama', model: 'phi3', actions: false });
+    expect(fetchMock).toHaveBeenCalledWith('/api/engine');
+  });
+
+  it('returns null, never throws, for an error status, an odd body or no server', async () => {
+    mockFetch(new Response('{"error":{}}', { status: 503 }));
+    expect(await fetchEngineInfo()).toBeNull();
+    mockFetch(new Response('{"engine":"x"}'));
+    expect(await fetchEngineInfo()).toBeNull();
+    mockFetch(() => Promise.reject(new TypeError('Failed to fetch')));
+    expect(await fetchEngineInfo()).toBeNull();
+  });
+});
+
 describe('streamChat', () => {
   it('posts the whole history and streams deltas until done', async () => {
     const fetchMock = mockFetch(
       ndjson([
-        { type: 'start', engine: 'mock', model: 'echo' },
+        { type: 'start', engine: 'mock', model: 'echo', actions: true },
         { type: 'delta', text: 'Hel' },
         { type: 'delta', text: 'lo' },
         { type: 'done' },
@@ -58,7 +77,7 @@ describe('streamChat', () => {
     await streamChat(history, { onDelta: (text) => deltas.push(text), onStart });
 
     expect(deltas.join('')).toBe('Hello');
-    expect(onStart).toHaveBeenCalledWith({ engine: 'mock', model: 'echo' });
+    expect(onStart).toHaveBeenCalledWith({ engine: 'mock', model: 'echo', actions: true });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/chat');
     expect(JSON.parse(init.body as string)).toEqual({ messages: history });
@@ -67,7 +86,7 @@ describe('streamChat', () => {
   it('sends the open to-dos and reports an action event (B-11)', async () => {
     const fetchMock = mockFetch(
       ndjson([
-        { type: 'start', engine: 'mock', model: 'echo' },
+        { type: 'start', engine: 'mock', model: 'echo', actions: true },
         { type: 'action', action: { kind: 'complete', id: 't1', query: 'the deploy one' } },
         { type: 'done' },
       ]),
@@ -90,7 +109,7 @@ describe('streamChat', () => {
   it('turns a server error event into a ChatError with its code and engine', async () => {
     mockFetch(
       ndjson([
-        { type: 'start', engine: 'anthropic', model: 'm' },
+        { type: 'start', engine: 'anthropic', model: 'm', actions: true },
         {
           type: 'error',
           error: { code: 'rate_limit', message: 'HTTP 429', engine: 'anthropic', retryable: true },
@@ -137,7 +156,9 @@ describe('streamChat', () => {
   });
 
   it('reports "timeout" when no data arrives within the idle limit', async () => {
-    mockFetch(ndjson([{ type: 'start', engine: 'mock', model: 'echo' }], { close: false }));
+    mockFetch(
+      ndjson([{ type: 'start', engine: 'mock', model: 'echo', actions: true }], { close: false }),
+    );
     const error = await failure(streamChat(history, { onDelta: vi.fn(), idleTimeoutMs: 50 }));
     expect(error.info.code).toBe('timeout');
   });

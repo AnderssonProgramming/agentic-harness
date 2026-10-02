@@ -14,6 +14,8 @@ export function ollamaEngine({ baseUrl, model, fetchImpl = fetch }: OllamaOption
   return {
     name: 'ollama',
     model,
+    // No tools are declared: small local models don't call them reliably (ADR-11).
+    actions: false,
     async *stream({ system, messages, signal }) {
       let response: Response;
       try {

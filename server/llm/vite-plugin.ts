@@ -1,7 +1,7 @@
 import { loadEnv, type Connect, type Plugin } from 'vite';
 import { LLM_CONFIG } from './config.ts';
 import type { Env } from './engine.ts';
-import { createChatHandler } from './handler.ts';
+import { createChatHandler, createEngineInfoHandler } from './handler.ts';
 
 /**
  * Serves the chat endpoint from Vite's own dev and preview servers (ADR-08), so the app still
@@ -12,8 +12,12 @@ export function llmApi(): Plugin {
   let env: Env = {};
   const mount = (middlewares: Connect.Server) => {
     const handleChat = createChatHandler({ env: () => env });
+    const handleEngineInfo = createEngineInfoHandler({ env: () => env });
     middlewares.use(LLM_CONFIG.route, (req, res, next) => {
       handleChat(req, res).catch(next);
+    });
+    middlewares.use(LLM_CONFIG.engineRoute, (req, res) => {
+      handleEngineInfo(req, res);
     });
   };
   return {

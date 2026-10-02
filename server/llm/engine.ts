@@ -40,7 +40,10 @@ export function selectEngine(env: Env): Engine {
         model: setting(env, 'OLLAMA_MODEL', LLM_CONFIG.ollamaModel),
       });
     case 'mock':
-      return mockEngine({ delayMs: Number(setting(env, 'MOCK_DELAY_MS', '25')) || 0 });
+      return mockEngine({
+        delayMs: Number(setting(env, 'MOCK_DELAY_MS', '25')) || 0,
+        tools: setting(env, 'MOCK_TOOLS', 'on') !== 'off',
+      });
     default:
       throw chatError(
         'config',

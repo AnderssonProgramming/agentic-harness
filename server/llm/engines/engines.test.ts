@@ -324,26 +324,36 @@ describe('mockEngine', () => {
 });
 
 describe('mockIntent (B-11)', () => {
-  it.each([
-    ['Remind me to ask Ana how deploys work', { kind: 'add', text: 'ask Ana how deploys work' }],
-    ['remind me to read the style guide!', { kind: 'add', text: 'read the style guide' }],
-    ['Add set up the VPN to my list', { kind: 'add', text: 'set up the VPN' }],
-    ['add pair with Bo to my to-do list.', { kind: 'add', text: 'pair with Bo' }],
-    ["What's on my list?", { kind: 'list' }],
-    ['whats on my todo list', { kind: 'list' }],
-    ['Mark the deploy one as done', { kind: 'complete', id: null, query: 'the deploy one' }],
-    ['Remind me to ask Bo about tests [mock:slow]', { kind: 'add', text: 'ask Bo about tests' }],
-  ])('maps "%s"', (message, action) => {
-    expect(mockIntent(message)).toEqual(action);
+  it('maps the to-do phrases, ignoring test markers', () => {
+    expect(mockIntent('Remind me to ask Bo about tests [mock:slow]')).toEqual([
+      { kind: 'add', text: 'ask Bo about tests' },
+    ]);
+    expect(mockIntent('How do we name branches?')).toEqual([]);
   });
 
-  it.each([
-    'How do we name branches?',
-    'Can you remind me how deploys work?',
-    'What is on the menu?',
-    'Mark my words',
-  ])('leaves "%s" as an ordinary message', (message) => {
-    expect(mockIntent(message)).toBeNull();
+  it('yields every action of a message, in order, as one reply', async () => {
+    const chunks = await all(
+      mockEngine({ delayMs: 0 }).stream({
+        ...input(),
+        messages: [
+          { role: 'user', content: 'Remind me to read the guide. Mark the VPN one as done.' },
+        ],
+      }),
+    );
+    expect(chunks).toEqual([
+      { kind: 'add', text: 'read the guide' },
+      { kind: 'complete', id: null, query: 'the VPN one' },
+    ]);
+  });
+
+  it('behaves like an engine without tool calling when tools are off (MOCK_TOOLS=off)', async () => {
+    const engine = mockEngine({ delayMs: 0, tools: false });
+    expect(engine.actions).toBe(false);
+    const chunks = await all(
+      engine.stream({ ...input(), messages: [{ role: 'user', content: 'Remind me to x' }] }),
+    );
+    expect(chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
+    expect(mockEngine({ delayMs: 0 }).actions).toBe(true);
   });
 });
 

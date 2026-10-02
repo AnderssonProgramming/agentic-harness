@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { chatError, isChatError } from '../../src/shared/llm/errors.ts';
-import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
+import type { EngineInfo, StreamEvent } from '../../src/shared/llm/protocol.ts';
+import { isTodoRequest } from '../../src/shared/llm/todo-phrases.ts';
 import { LLM_CONFIG } from './config.ts';
 import { selectEngine, type Env } from './engine.ts';
 import type { Engine } from './engines/types.ts';
@@ -30,6 +31,42 @@ async function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unk
   } catch {
     throw chatError('bad_request', 'Request body is not valid JSON');
   }
+}
+
+/**
+ * GET → the active engine and whether it can run to-do actions (EngineInfo, ADR-11), so the
+ * browser can show its notice before the first message. A bad configuration answers 503.
+ */
+export function createEngineInfoHandler({
+  env,
+  engineFor = selectEngine,
+}: Pick<ChatHandlerOptions, 'env' | 'engineFor'>) {
+  return function handleEngineInfo(req: IncomingMessage, res: ServerResponse): void {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('allow', 'GET');
+      res.end();
+      return;
+    }
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.setHeader('cache-control', 'no-store');
+    try {
+      const engine = engineFor(env());
+      const info: EngineInfo = {
+        engine: engine.name,
+        model: engine.model,
+        actions: engine.actions,
+      };
+      res.statusCode = 200;
+      res.end(JSON.stringify(info));
+    } catch (error) {
+      const failure = isChatError(error)
+        ? error
+        : chatError('unknown', error instanceof Error ? error.message : String(error));
+      res.statusCode = 503;
+      res.end(JSON.stringify({ error: failure.info }));
+    }
+  };
 }
 
 /**
@@ -76,7 +113,13 @@ export function createChatHandler({
       const todos = parseTodoRefs(body);
       const engine = engineFor(env());
       engineName = engine.name;
-      send({ type: 'start', engine: engine.name, model: engine.model });
+      send({ type: 'start', engine: engine.name, model: engine.model, actions: engine.actions });
+      // An engine without tool calling would answer a to-do request as if it had done it, so the
+      // request never reaches it; the browser shows the app's refusal instead (ADR-11).
+      if (!engine.actions && isTodoRequest(messages.at(-1)?.content ?? '')) {
+        send({ type: 'done' });
+        return;
+      }
       restartIdleTimer();
       for await (const chunk of engine.stream({
         system: SYSTEM_PROMPT,

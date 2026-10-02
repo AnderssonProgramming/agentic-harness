@@ -52,8 +52,18 @@ export interface ChatErrorInfo {
   retryable: boolean;
 }
 
+/**
+ * The active engine, from `GET /api/engine` and from every reply's `start` event. `actions` is
+ * false when the engine has no tool calling, so it can't run to-do actions (ADR-11).
+ */
+export interface EngineInfo {
+  engine: string;
+  model: string;
+  actions: boolean;
+}
+
 export type StreamEvent =
-  | { type: 'start'; engine: string; model: string }
+  | { type: 'start'; engine: string; model: string; actions: boolean }
   | { type: 'delta'; text: string }
   | { type: 'action'; action: TodoAction }
   | { type: 'done' }
@@ -118,11 +128,20 @@ export function isTodoRef(value: unknown): value is TodoRef {
   return isRecord(value) && typeof value.id === 'string' && typeof value.text === 'string';
 }
 
+export function isEngineInfo(value: unknown): value is EngineInfo {
+  return (
+    isRecord(value) &&
+    typeof value.engine === 'string' &&
+    typeof value.model === 'string' &&
+    typeof value.actions === 'boolean'
+  );
+}
+
 export function isStreamEvent(value: unknown): value is StreamEvent {
   if (!isRecord(value)) return false;
   switch (value.type) {
     case 'start':
-      return typeof value.engine === 'string' && typeof value.model === 'string';
+      return isEngineInfo(value);
     case 'delta':
       return typeof value.text === 'string';
     case 'action':

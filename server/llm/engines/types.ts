@@ -17,6 +17,8 @@ export type EngineChunk = string | TodoAction;
 export interface Engine {
   name: EngineName;
   model: string;
+  /** Whether it can request to-do actions (tool calling). False: to-do phrases never reach it (ADR-11). */
+  actions: boolean;
   stream: (input: EngineStreamInput) => AsyncGenerator<EngineChunk>;
 }
 

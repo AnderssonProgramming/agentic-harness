@@ -6,7 +6,7 @@ import { chatError } from '../../src/shared/llm/errors.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import type { Env } from './engine.ts';
 import type { Engine } from './engines/types.ts';
-import { createChatHandler } from './handler.ts';
+import { createChatHandler, createEngineInfoHandler } from './handler.ts';
 
 let server: Server | undefined;
 
@@ -46,7 +46,7 @@ describe('chat handler', () => {
   it('streams start, deltas and done from the configured engine', async () => {
     const url = await start({ env: () => mockEnv });
     const events = await post(url, hi);
-    expect(events[0]).toEqual({ type: 'start', engine: 'mock', model: 'echo' });
+    expect(events[0]).toEqual({ type: 'start', engine: 'mock', model: 'echo', actions: true });
     expect(events.filter((e) => e.type === 'delta').length).toBeGreaterThan(3);
     expect(events.at(-1)).toEqual({ type: 'done' });
   });
@@ -82,6 +82,7 @@ describe('chat handler', () => {
     const engine: Engine = {
       name: 'mock',
       model: 'spy',
+      actions: true,
       async *stream({ todos }) {
         seen.push(todos);
         await Promise.resolve();
@@ -95,6 +96,46 @@ describe('chat handler', () => {
 
     const events = await post(url, { ...hi, todos: [{ id: 1 }] });
     expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'bad_request' } });
+  });
+
+  it('never sends a to-do phrase to an engine without actions, and says so in start (B-11)', async () => {
+    let called = false;
+    const plain: Engine = {
+      name: 'ollama',
+      model: 'phi3',
+      actions: false,
+      async *stream() {
+        called = true;
+        await Promise.resolve();
+        yield 'Okay, I have set a reminder for you.';
+      },
+    };
+    const url = await start({ env: () => mockEnv, engineFor: () => plain });
+    const refused = await post(url, {
+      messages: [
+        { role: 'user', content: 'Hi' },
+        { role: 'assistant', content: 'Hello' },
+        { role: 'user', content: 'Remind me to ask Ana how deploys work.' },
+      ],
+    });
+    expect(refused).toEqual([
+      { type: 'start', engine: 'ollama', model: 'phi3', actions: false },
+      { type: 'done' },
+    ]);
+    expect(called).toBe(false);
+
+    const ordinary = await post(url, { messages: [{ role: 'user', content: 'How do I deploy?' }] });
+    expect(ordinary.map((e) => e.type)).toEqual(['start', 'delta', 'done']);
+    expect(called).toBe(true);
+  });
+
+  it('refuses a to-do phrase on the mock with MOCK_TOOLS=off (B-11)', async () => {
+    const url = await start({ env: () => ({ ...mockEnv, MOCK_TOOLS: 'off' }) });
+    const events = await post(url, { messages: [{ role: 'user', content: "What's on my list?" }] });
+    expect(events).toEqual([
+      { type: 'start', engine: 'mock', model: 'echo', actions: false },
+      { type: 'done' },
+    ]);
   });
 
   it('answers malformed requests with a bad_request error event', async () => {
@@ -128,6 +169,7 @@ describe('chat handler', () => {
     const stalled: Engine = {
       name: 'mock',
       model: 'stalled',
+      actions: true,
       async *stream({ signal }) {
         await new Promise((_, reject) => {
           signal.addEventListener('abort', () => {
@@ -149,6 +191,7 @@ describe('chat handler', () => {
     const slow: Engine = {
       name: 'mock',
       model: 'slow',
+      actions: true,
       async *stream({ signal }) {
         yield 'first ';
         await new Promise<void>((resolve) => {
@@ -172,5 +215,40 @@ describe('chat handler', () => {
     await vi.waitFor(() => {
       expect(cancelled).toBe(true);
     });
+  });
+});
+
+describe('engine info handler (B-11)', () => {
+  async function serve(env: Env): Promise<string> {
+    const handle = createEngineInfoHandler({ env: () => env });
+    const created = createServer(handle);
+    server = created;
+    await new Promise<void>((resolve) => created.listen(0, '127.0.0.1', resolve));
+    return `http://127.0.0.1:${String((created.address() as AddressInfo).port)}`;
+  }
+
+  it.each([
+    [mockEnv, { engine: 'mock', model: 'echo', actions: true }],
+    [
+      { ...mockEnv, MOCK_TOOLS: 'off' },
+      { engine: 'mock', model: 'echo', actions: false },
+    ],
+    [{ INFERENCE_ENGINE: 'ollama' }, { engine: 'ollama', model: 'phi3', actions: false }],
+    [
+      { INFERENCE_ENGINE: 'anthropic', ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'm' },
+      { engine: 'anthropic', model: 'm', actions: true },
+    ],
+  ])('reports whether the engine can run actions (%o)', async (env, info) => {
+    const response = await fetch(await serve(env));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(info);
+  });
+
+  it('answers 503 with a config error for a bad configuration, and 405 for other methods', async () => {
+    const url = await serve({ INFERENCE_ENGINE: 'anthropic', ANTHROPIC_API_KEY: '' });
+    const response = await fetch(url);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: 'config' } });
+    expect((await fetch(url, { method: 'POST' })).status).toBe(405);
   });
 });

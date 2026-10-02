@@ -1,31 +1,22 @@
 import { chatError } from '../../../src/shared/llm/errors.ts';
 import { isChatErrorCode, type TodoAction } from '../../../src/shared/llm/protocol.ts';
+import { todoPhraseActions } from '../../../src/shared/llm/todo-phrases.ts';
 import { IDLE_TIMEOUT } from '../errors.ts';
 import type { Engine } from './types.ts';
 
-const clean = (text: string) =>
-  text
-    .trim()
-    .replace(/[.!?]+$/, '')
-    .trim();
-
 /**
  * The mock's stand-in for tool calling (ADR-11): the same to-do actions a model would request,
- * from four fixed phrases. Anything else is an ordinary message.
+ * one per to-do sentence of the message, in order. Anything else is an ordinary message.
  */
-export function mockIntent(message: string): TodoAction | null {
-  const text = clean(message.replace(/\[mock:[a-z_]+\]/g, ''));
-  const add = /^remind me to (.+)$/i.exec(text) ?? /^add (.+) to my (?:to-?do )?list$/i.exec(text);
-  if (add) return { kind: 'add', text: clean(add[1]) };
-  if (/^what(?:'|’)?s on my (?:to-?do )?list$/i.test(text)) return { kind: 'list' };
-  const complete = /^mark (.+) as done$/i.exec(text);
-  if (complete) return { kind: 'complete', id: null, query: clean(complete[1]) };
-  return null;
+export function mockIntent(message: string): TodoAction[] {
+  return todoPhraseActions(message.replace(/\s*\[mock:[a-z_]+\]/g, ''));
 }
 
 interface MockOptions {
   /** Pause between words, in ms. */
   delayMs: number;
+  /** False behaves like an engine without tool calling (MOCK_TOOLS=off): it never yields actions. */
+  tools?: boolean;
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -50,12 +41,14 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * Deterministic engine for tests and offline demos; no model is called. It echoes the last
  * message and counts the user turns it received, which proves the history arrives.
  * Test hooks in the user's message: "[mock:<error code>]" fails with that code, "[mock:slow]"
- * streams ten times slower. The to-do phrases of `mockIntent` yield an action instead of text.
+ * streams ten times slower. The to-do phrases of `mockIntent` yield actions instead of text,
+ * unless `tools` is off.
  */
-export function mockEngine({ delayMs }: MockOptions): Engine {
+export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
   return {
     name: 'mock',
     model: 'echo',
+    actions: tools,
     async *stream({ messages, signal }) {
       const last = messages.at(-1)?.content ?? '';
       // Only the newest message counts: after a failed reply, the server merges the next message
@@ -77,9 +70,9 @@ export function mockEngine({ delayMs }: MockOptions): Engine {
             : chatError('aborted', 'mock request cancelled', 'mock');
         }
       };
-      const action = mockIntent(newest);
-      if (action) {
-        yield action;
+      const actions = tools ? mockIntent(newest) : [];
+      if (actions.length > 0) {
+        for (const action of actions) yield action;
         // Like a model finishing its turn after a tool call, so the pending card is observable.
         await wait();
         return;

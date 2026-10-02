@@ -1,6 +1,32 @@
 import { chatError, isChatError } from './errors.ts';
 import { readLines } from './lines.ts';
-import { isStreamEvent, type ChatTurn, type TodoAction, type TodoRef } from './protocol.ts';
+import {
+  isEngineInfo,
+  isStreamEvent,
+  type ChatTurn,
+  type EngineInfo,
+  type TodoAction,
+  type TodoRef,
+} from './protocol.ts';
+
+const ENGINE_ENDPOINT = '/api/engine';
+
+/**
+ * Asks the server which engine is active and whether it can run to-do actions (ADR-11).
+ * Never throws: `null` means unknown (server unreachable, bad configuration, odd answer).
+ */
+export async function fetchEngineInfo(endpoint = ENGINE_ENDPOINT): Promise<EngineInfo | null> {
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) return null;
+    const info: unknown = await response.json();
+    return isEngineInfo(info)
+      ? { engine: info.engine, model: info.model, actions: info.actions }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface StreamChatOptions {
   onDelta: (text: string) => void;
@@ -8,7 +34,7 @@ export interface StreamChatOptions {
   onAction?: (action: TodoAction) => void;
   /** The user's open to-dos, sent so the model can name one. */
   todos?: readonly TodoRef[];
-  onStart?: (source: { engine: string; model: string }) => void;
+  onStart?: (source: EngineInfo) => void;
   /** Aborting it stops the reply; streamChat then rejects with code "aborted". */
   signal?: AbortSignal;
   /** Fails with "timeout" when no data arrives for this long. */
@@ -73,7 +99,7 @@ export async function streamChat(
       }
       if (event.type === 'start') {
         engine = event.engine;
-        options.onStart?.({ engine: event.engine, model: event.model });
+        options.onStart?.({ engine: event.engine, model: event.model, actions: event.actions });
       } else if (event.type === 'delta') {
         options.onDelta(event.text);
       } else if (event.type === 'action') {

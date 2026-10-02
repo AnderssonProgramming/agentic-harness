@@ -27,4 +27,11 @@ describe('isTodoAction (B-11)', () => {
     expect(isStreamEvent({ type: 'action', action: { kind: 'list' } })).toBe(true);
     expect(isStreamEvent({ type: 'action', action: { kind: 'list!' } })).toBe(false);
   });
+
+  it('requires a start event to say whether the engine can run actions', () => {
+    expect(isStreamEvent({ type: 'start', engine: 'ollama', model: 'phi3', actions: false })).toBe(
+      true,
+    );
+    expect(isStreamEvent({ type: 'start', engine: 'ollama', model: 'phi3' })).toBe(false);
+  });
 });
