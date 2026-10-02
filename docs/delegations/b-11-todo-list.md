@@ -160,3 +160,13 @@ In the PO's independent verification of pass 2, `npm run verify:todos` failed **
 ### Limits
 
 The same as pass 2. The B-11 criteria don't change. If you find the intermittent unit test from pass 2, treat it the same way (root cause, then fix), as a separate commit.
+
+### Plan (Amendment 2)
+
+Written by the `feature-builder` subagent before the first change of this pass. Each commit after `npm run format` and `npm run -s check`.
+
+| #   | Step                                                                                                                                                                                       | Files                                | Criteria |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | -------- |
+| B1  | Reproduce: the no-tools scenario delays the page's `GET /api/engine` response (a fetch wrapper injected before the app loads), so the bad ordering happens every run. `verify:todos` fails | `scripts/verify-todos.mjs`           | 1, 2     |
+| B2  | Fix (`fix:`): the check waits for the notice to show, with a timeout and a failure message naming the notice and its last state, instead of reading it once after the reload               | `scripts/verify-todos.mjs`           | 3        |
+| B3  | Reliability: `verify:todos` ×10 and `npx vitest run` ×5 in the foreground; counts and any failure, by full name, in the evidence file                                                      | `docs/evidence/b-11-verification.md` | 4        |
