@@ -9,3 +9,6 @@ export const MAX_TODO_LENGTH = 200;
 
 /** Open to-dos sent with one request. */
 export const MAX_TODOS_SENT = 50;
+
+/** Characters in one to-do's id: the browser's ids are `crypto.randomUUID()`, always 36 (LLM-05). */
+export const MAX_TODO_ID_LENGTH = 36;

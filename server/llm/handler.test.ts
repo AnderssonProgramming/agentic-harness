@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatError } from '../../src/shared/llm/errors.ts';
 import {
   MAX_MESSAGE_LENGTH,
+  MAX_TODO_ID_LENGTH,
   MAX_TODO_LENGTH,
   MAX_TODOS_SENT,
 } from '../../src/shared/llm/limits.ts';
@@ -236,6 +237,26 @@ describe('chat handler', () => {
     expect(sent.reduce((total, turn) => total + turn.content.length, 0)).toBeLessThanOrEqual(
       LLM_CONFIG.historyChars,
     );
+  });
+
+  it('rejects a to-do id over 36 characters without calling the engine (F-04 bypass, LLM-05)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const withId = (id: string) => ({ ...hi, todos: [{ id, text: 'read the guide' }] });
+
+    expect((await post(url, withId('x'.repeat(100_000)))).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect((await post(url, withId('x'.repeat(MAX_TODO_ID_LENGTH + 1)))).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect(engine.calls).toHaveLength(0);
+
+    expect((await post(url, withId(crypto.randomUUID()))).at(-1)).toEqual({ type: 'done' });
+    expect(engine.calls).toHaveLength(1);
   });
 
   it('accepts 50 to-do refs and rejects 51 without calling the engine (F-04)', async () => {

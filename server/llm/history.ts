@@ -1,6 +1,7 @@
 import { chatError } from '../../src/shared/llm/errors.ts';
 import {
   MAX_MESSAGE_LENGTH,
+  MAX_TODO_ID_LENGTH,
   MAX_TODO_LENGTH,
   MAX_TODOS_SENT,
 } from '../../src/shared/llm/limits.ts';
@@ -19,6 +20,13 @@ export function parseTodoRefs(body: unknown): TodoRef[] {
   }
   if (body.todos.some((todo) => todo.text.length > MAX_TODO_LENGTH)) {
     throw chatError('bad_request', `a to-do is longer than ${String(MAX_TODO_LENGTH)} characters`);
+  }
+  // The id goes into the prompt too (LLM-05).
+  if (body.todos.some((todo) => todo.id.length > MAX_TODO_ID_LENGTH)) {
+    throw chatError(
+      'bad_request',
+      `a to-do id is longer than ${String(MAX_TODO_ID_LENGTH)} characters`,
+    );
   }
   return body.todos.map(({ id, text }) => ({ id, text }));
 }

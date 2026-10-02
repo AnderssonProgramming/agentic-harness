@@ -7,7 +7,7 @@ import {
   parseJsonLine,
   upstreamFailure,
 } from '../errors.ts';
-import { actionFromToolUse, TODO_TOOLS, todoContext } from '../todo-tools.ts';
+import { actionFromToolUse, systemWithTodos, TODO_TOOLS } from '../todo-tools.ts';
 import type { Engine, FetchLike, TokenUsage } from './types.ts';
 
 interface AnthropicOptions {
@@ -42,7 +42,7 @@ export function anthropicEngine({
           },
           body: JSON.stringify({
             model,
-            system: `${system}\n\n${todoContext(todos)}`,
+            system: systemWithTodos(system, todos),
             messages,
             max_tokens: maxOutputTokens,
             stream: true,

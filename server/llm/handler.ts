@@ -8,6 +8,7 @@ import type { Engine, TokenUsage } from './engines/types.ts';
 import { IDLE_TIMEOUT } from './errors.ts';
 import { parseChatRequest, parseTodoRefs, trimHistory } from './history.ts';
 import { SYSTEM_PROMPT } from './system-prompt.ts';
+import { MAX_PROMPT_ADDITIONS, promptAdditionsLength } from './todo-tools.ts';
 
 interface ChatHandlerOptions {
   /** Read on every request, so tests and the verify script can change it. */
@@ -123,6 +124,13 @@ export function createChatHandler({
       const body = await readJsonBody(req, LLM_CONFIG.maxRequestBytes);
       const messages = trimHistory(parseChatRequest(body), LLM_CONFIG.historyChars);
       const todos = parseTodoRefs(body);
+      // The per-field limits keep this under the bound; the check keeps the invariant if they change.
+      if (promptAdditionsLength(SYSTEM_PROMPT, todos) > MAX_PROMPT_ADDITIONS) {
+        throw chatError(
+          'bad_request',
+          `The to-dos make the prompt longer than ${String(MAX_PROMPT_ADDITIONS)} characters`,
+        );
+      }
       const engine = engineFor(env());
       engineName = engine.name;
       send({ type: 'start', engine: engine.name, model: engine.model, actions: engine.actions });

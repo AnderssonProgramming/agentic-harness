@@ -48,6 +48,23 @@ export function todoContext(todos: readonly TodoRef[]): string {
   return `${list}\nUse the to-do tools to add, list or complete to-dos, one tool call for each thing the user asks for, in the order they asked. Never answer what is on the list from memory: call list_todos.`;
 }
 
+/** The system prompt an engine with the to-do tools receives. */
+export function systemWithTodos(system: string, todos: readonly TodoRef[]): string {
+  return `${system}\n\n${todoContext(todos)}`;
+}
+
+/**
+ * Most characters the server adds to a request (LLM-05): the system prompt with the to-do context
+ * and the tool definitions. A test checks that the worst case at the shared limits (50 to-dos,
+ * 36-character ids, 200-character texts) stays under it.
+ */
+export const MAX_PROMPT_ADDITIONS = 16_000;
+
+/** Characters the server adds for an engine with the to-do tools, the largest case. */
+export function promptAdditionsLength(system: string, todos: readonly TodoRef[]): number {
+  return systemWithTodos(system, todos).length + JSON.stringify(TODO_TOOLS).length;
+}
+
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 /** Turns a tool call into an action, or null when the tool or its input isn't valid. */
