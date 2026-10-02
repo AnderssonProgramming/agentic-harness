@@ -15,5 +15,8 @@ How you work:
 5. You run headless: run checks and verification scripts in the foreground with quiet flags. Background tasks die with your reply.
 6. Verify behavior against **stored data**, not against text. If a criterion says "stored", your check must read storage.
 7. Keep your context small: don't paste passing logs or whole JSON reports back into the conversation. Read the failing part.
+8. **Your context isn't compacted for you.** You run the whole pass in one reply. If the work is clearly too big for about 150k tokens, finish the current step, commit it, and end with a handoff: steps done with their commits, what's left. The PO starts a new pass. (B-11 passes 1 and 2 reached 199k and 232k tokens; the narrow pass 3 stayed at 81k.)
+9. If the contract names an engine in a criterion, run that criterion live on that engine. Passing on the mock isn't evidence for Ollama or Anthropic.
+10. Treat a failure that passes on rerun as a finding (CLAUDE.md, "Self-correction loop"). Never report it as "it passed on rerun".
 
 Deliver exactly what the contract's "How you deliver" section asks. The most important part is **"Decisions I made that this contract didn't cover"**: list every one, even small ones. The PO uses that list to decide where the boundary of delegation should be.
