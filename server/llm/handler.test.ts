@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createServer, type Server } from 'node:http';
+import { Agent, createServer, request, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatError } from '../../src/shared/llm/errors.ts';
@@ -46,6 +46,31 @@ async function post(url: string, body: unknown): Promise<StreamEvent[]> {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as StreamEvent);
+}
+
+/** A POST through a given agent, so a test controls which connection it reuses. Fails instead of hanging. */
+function rawPost(
+  agent: Agent,
+  url: string,
+  body: string,
+): Promise<{ headers: IncomingHttpHeaders; events: StreamEvent[] }> {
+  return new Promise((resolve, reject) => {
+    const req = request(url, { method: 'POST', agent, timeout: 3000 }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk: string) => (text += chunk));
+      res.on('end', () => {
+        const events = text
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line) as StreamEvent);
+        resolve({ headers: res.headers, events });
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('no answer within 3 s: the request hung')));
+    req.on('error', reject);
+    req.end(body);
+  });
 }
 
 /** An engine that records every call it gets and answers "ok". */
@@ -170,6 +195,42 @@ describe('chat handler', () => {
       type: 'error',
       error: { code: 'bad_request' },
     });
+  });
+
+  it('closes the connection after an oversized body, so later requests on the same pool are answered (P-01, ERR-02)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const timed = (body: string) =>
+      fetch(url, { method: 'POST', body, signal: AbortSignal.timeout(3000) });
+    // fetch's keep-alive pool, as the property test uses. A warm connection is the one reused.
+    expect(await (await timed(JSON.stringify(hi))).text()).toContain('"done"');
+    // 400 KB: big enough that the upload is still going when the server rejects it.
+    const long = Array.from({ length: 100 }, () => ({ role: 'user', content: 'm'.repeat(4000) }));
+    const oversized = JSON.stringify({ messages: long });
+    expect(oversized.length).toBeGreaterThan(LLM_CONFIG.maxRequestBytes);
+    expect(await (await timed(oversized)).text()).toContain('"bad_request"');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await (await timed(JSON.stringify(hi))).text()).toContain('"done"');
+    }
+    expect(engine.calls).toHaveLength(3);
+
+    // The rejection says it closes the connection, so no client reuses it.
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    try {
+      const rejected = await rawPost(agent, url, oversized);
+      expect(rejected.headers.connection).toBe('close');
+      expect(rejected.events.at(-1)).toMatchObject({
+        type: 'error',
+        error: { code: 'bad_request' },
+      });
+      expect((await rawPost(agent, url, JSON.stringify(hi))).events.at(-1)).toEqual({
+        type: 'done',
+      });
+    } finally {
+      agent.destroy();
+    }
   });
 
   it('rejects a user message over 4,000 characters without calling the engine (F-01)', async () => {

@@ -29,21 +29,43 @@ function logUsage(engine: Engine, usage: TokenUsage): void {
   );
 }
 
-async function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
-    size += buffer.length;
-    if (size > maxBytes)
-      throw chatError('bad_request', `Request body is larger than ${String(maxBytes)} bytes`);
-    chunks.push(buffer);
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    throw chatError('bad_request', 'Request body is not valid JSON');
-  }
+/**
+ * An oversized body is rejected at once, but the rest of its upload is still on the connection:
+ * reused, it would make the next request hang (P-01). So the reply closes the connection, and the
+ * remaining bytes are read and discarded until Node closes the socket after the reply.
+ */
+function readJsonBody(
+  req: IncomingMessage,
+  res: ServerResponse,
+  maxBytes: number,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let oversized = false;
+    req.on('data', (chunk: Buffer | string) => {
+      if (oversized) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += buffer.length;
+      if (size > maxBytes) {
+        oversized = true;
+        chunks.length = 0;
+        res.setHeader('connection', 'close');
+        reject(chatError('bad_request', `Request body is larger than ${String(maxBytes)} bytes`));
+        return;
+      }
+      chunks.push(buffer);
+    });
+    req.on('error', reject);
+    req.on('end', () => {
+      if (oversized) return;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(chatError('bad_request', 'Request body is not valid JSON'));
+      }
+    });
+  });
 }
 
 /**
@@ -121,7 +143,7 @@ export function createChatHandler({
 
     let engineName: string | null = null;
     try {
-      const body = await readJsonBody(req, LLM_CONFIG.maxRequestBytes);
+      const body = await readJsonBody(req, res, LLM_CONFIG.maxRequestBytes);
       const messages = trimHistory(parseChatRequest(body), LLM_CONFIG.historyChars);
       const todos = parseTodoRefs(body);
       // The per-field limits keep this under the bound; the check keeps the invariant if they change.
