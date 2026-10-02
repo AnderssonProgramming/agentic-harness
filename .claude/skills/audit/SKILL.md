@@ -24,7 +24,7 @@ None. Everything comes from `AUDIT-CRITERIA.md`, the code, and the commands belo
 | **Medium**   | Annoys or degrades, but doesn't break                       |
 | **Low**      | Cosmetic, or a future improvement                           |
 
-Each criterion has a default **"Risk if failed"**. Use it unless the evidence clearly puts the finding in another row of this table. If you change it, write the reason in the finding's evidence.
+Each criterion has a default **"Risk if failed"**. **Always report that default risk in the Risk column.** Reclassifying is the PO's decision, made in a separate triage after the run, not the auditor's. If the evidence suggests another risk, write "Suggested risk: X, because …" at the end of the Evidence cell. (Runs A and B on the same commit disagreed on LLM-02's risk when the auditor was allowed to reclassify, so the counts weren't comparable.)
 
 ## Steps
 
@@ -85,7 +85,7 @@ Run every command from the repository root in its plain form: one per call, no c
 
 Rules for the format:
 
-- One finding per failed criterion **per distinct location**.
+- **Exactly one finding per failed criterion.** Put the most representative `file:line` in the File column, and list every other location in the Evidence cell. (Splitting by location made the counts drift between runs.)
 - A failed criterion with no finding, or a finding without `file:line`, makes the report invalid.
 - IDs are `F-01`, `F-02`, … in the order of the criteria.
 

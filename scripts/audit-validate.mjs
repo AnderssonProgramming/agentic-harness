@@ -60,6 +60,13 @@ for (const r of findingRows) {
   if (!RISKS.includes(risk ?? ''))
     problems.push(`Finding ${id}: risk "${risk ?? ''}" isn't one of ${RISKS.join(', ')}`);
 }
+for (const id of new Set(findingRows.map((r) => r[1]))) {
+  const n = findingRows.filter((r) => r[1] === id).length;
+  if (n > 1)
+    problems.push(
+      `Criterion ${id ?? ''} has ${String(n)} findings; the skill requires exactly one per failed criterion`,
+    );
+}
 for (const id of failed) {
   if (!findingRows.some((r) => r[1] === id))
     problems.push(`Criterion ${id} is "failed" but has no finding`);
