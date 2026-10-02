@@ -105,9 +105,15 @@ When `npm run check` (or a skill's verification) fails during an approved task, 
 
 This pre-approval covers defects only: type errors, typos, broken imports, and tests that fail because of a defect. **Stop and ask** if the fix would change behavior or scope, touch configuration or dependencies, disable a rule or a test, or if `check` still fails after 3 attempts. Then show me the full output of the last attempt.
 
+**Intermittent failures are findings, not noise.** A test or check that fails once and passes on a rerun goes at the top of your report with its full name. Don't count it as passed. Make it fail deterministically (force the timing or ordering), find the cause, fix it, then show repeated passing runs. A check that confirms something is _absent_ must first wait for a state that proves it _could_ be present; otherwise it passes too early. (B-11, Amendment 2.)
+
 ## Delegation contracts
 
 A file in `docs/delegations/` with `Status: approved` is a plan I have already approved, like a skill's `SKILL.md`. The agent it's delegated to (`.claude/agents/feature-builder.md`) doesn't wait for another approval. It writes its step table into the contract and executes. The contract's **Decisions** and **Limits** are part of it, just as binding as this file. Anything the contract doesn't cover is the agent's to decide only if it's not a product question, and it must be listed in the delivery report under "Decisions I made that this contract didn't cover".
+
+Always product questions, even when they look technical: **anything that silently drops user data or part of a user's request** (resetting unreadable data with no notice, ignoring a second action, truncating input). Stop and ask; don't pick the quiet option. Also, **a prompt instruction is never the control** for something a criterion forbids. If the model mustn't claim an action happened, the app must make the claim impossible or visibly contradicted. (B-11, pass 1: both happened.)
+
+Verification scripts write screenshots to a scratch folder (`npm run verify:chat -- <tmp dir>`) unless the task is updating the evidence. Committed evidence must not change as a side effect of running a check.
 
 ## Available skills
 
