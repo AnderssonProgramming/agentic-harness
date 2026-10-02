@@ -158,7 +158,7 @@ Acceptance criteria (observable behavior; "stored" means what's in the browser's
 - **Engines:** works with Anthropic (live) and the mock engine (deterministic, for tests). With Ollama `phi3`, which has no tool calling, Compass answers in plain text and never shows a false confirmation.
 - **Evidence:** unit tests for intent mapping, execution and failure, plus a browser check that reads storage directly, including a restart.
 
-Status: in progress
+Status: done
 
 ### [B-12] "What's on my list?" answered from storage on every engine
 
