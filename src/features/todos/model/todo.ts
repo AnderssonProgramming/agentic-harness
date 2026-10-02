@@ -1,3 +1,4 @@
+import { MAX_TODO_LENGTH, MAX_TODOS_SENT } from '../../../shared/llm/limits';
 import type { TodoAction, TodoRef } from '../../../shared/llm/protocol';
 
 export interface Todo {
@@ -46,8 +47,20 @@ export function toView({ id, text, done }: Todo): TodoView {
   return { id, text, done };
 }
 
+/**
+ * The open to-dos sent with a request: the most recently added ones, at most MAX_TODOS_SENT, in
+ * the order they were added, so a request never breaks the server's limits (F-04). A text
+ * stored before the length limit existed is shortened in the ref only; storage keeps it whole.
+ */
 export function openRefs(todos: readonly Todo[]): TodoRef[] {
-  return todos.filter((todo) => !todo.done).map(({ id, text }) => ({ id, text }));
+  return todos
+    .filter((todo) => !todo.done)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(-MAX_TODOS_SENT)
+    .map(({ id, text }) => ({
+      id,
+      text: text.length > MAX_TODO_LENGTH ? `${text.slice(0, MAX_TODO_LENGTH - 1)}…` : text,
+    }));
 }
 
 export function addTodo(

@@ -1,5 +1,9 @@
 import { chatError } from '../../src/shared/llm/errors.ts';
-import { MAX_MESSAGE_LENGTH } from '../../src/shared/llm/limits.ts';
+import {
+  MAX_MESSAGE_LENGTH,
+  MAX_TODO_LENGTH,
+  MAX_TODOS_SENT,
+} from '../../src/shared/llm/limits.ts';
 import { isTodoRef, type ChatTurn, type TodoRef } from '../../src/shared/llm/protocol.ts';
 import { isRecord } from './errors.ts';
 
@@ -8,6 +12,13 @@ export function parseTodoRefs(body: unknown): TodoRef[] {
   if (!isRecord(body) || body.todos === undefined) return [];
   if (!Array.isArray(body.todos) || !body.todos.every(isTodoRef)) {
     throw chatError('bad_request', 'todos must be [{ id: string, text: string }]');
+  }
+  // Every ref goes into every prompt, so both bounds cap the cost of each request (F-04).
+  if (body.todos.length > MAX_TODOS_SENT) {
+    throw chatError('bad_request', `todos has more than ${String(MAX_TODOS_SENT)} items`);
+  }
+  if (body.todos.some((todo) => todo.text.length > MAX_TODO_LENGTH)) {
+    throw chatError('bad_request', `a to-do is longer than ${String(MAX_TODO_LENGTH)} characters`);
   }
   return body.todos.map(({ id, text }) => ({ id, text }));
 }

@@ -3,7 +3,11 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatError } from '../../src/shared/llm/errors.ts';
-import { MAX_MESSAGE_LENGTH } from '../../src/shared/llm/limits.ts';
+import {
+  MAX_MESSAGE_LENGTH,
+  MAX_TODO_LENGTH,
+  MAX_TODOS_SENT,
+} from '../../src/shared/llm/limits.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import type { Env } from './engine.ts';
 import type { Engine, EngineStreamInput } from './engines/types.ts';
@@ -193,6 +197,49 @@ describe('chat handler', () => {
     });
     expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'bad_request' } });
     expect(engine.calls).toHaveLength(0);
+  });
+
+  it('accepts 50 to-do refs and rejects 51 without calling the engine (F-04)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const refs = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({ id: `t${String(i)}`, text: 'read the guide' }));
+
+    expect((await post(url, { ...hi, todos: refs(MAX_TODOS_SENT + 1) })).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect(engine.calls).toHaveLength(0);
+
+    expect((await post(url, { ...hi, todos: refs(MAX_TODOS_SENT) })).at(-1)).toEqual({
+      type: 'done',
+    });
+    expect(engine.calls.map((call) => call.todos.length)).toEqual([MAX_TODOS_SENT]);
+  });
+
+  it('accepts a 200-character to-do and rejects 201 without calling the engine (F-04)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const withText = (text: string) => ({
+      ...hi,
+      todos: [
+        { id: 't1', text: 'short' },
+        { id: 't2', text },
+      ],
+    });
+
+    expect((await post(url, withText('a'.repeat(MAX_TODO_LENGTH + 1)))).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect(engine.calls).toHaveLength(0);
+
+    expect((await post(url, withText('a'.repeat(MAX_TODO_LENGTH)))).at(-1)).toEqual({
+      type: 'done',
+    });
+    expect(engine.calls).toHaveLength(1);
   });
 
   it('rejects methods other than POST', async () => {

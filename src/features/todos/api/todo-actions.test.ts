@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_TODO_LENGTH, MAX_TODOS_SENT } from '../../../shared/llm/limits';
 import { fakeStorage } from './fake-storage';
 import { createTodoActions } from './todo-actions';
 import { TODO_STORAGE_KEY, createTodoStore } from './todo-store';
@@ -128,6 +129,31 @@ describe('to-do actions (B-11)', () => {
     actions.execute({ kind: 'add', text: 'b' });
     actions.execute({ kind: 'complete', id: 't1', query: '' });
     expect(actions.openRefs()).toEqual([{ id: 't2', text: 'b' }]);
+  });
+
+  it('sends at most the 50 most recently added open to-dos, and keeps all 60 stored (F-04)', () => {
+    const { actions, stored } = setup();
+    for (let i = 1; i <= 60; i++) actions.execute({ kind: 'add', text: `to-do ${String(i)}` });
+    actions.execute({ kind: 'complete', id: 't60', query: '' });
+
+    const refs = actions.openRefs();
+    expect(refs).toHaveLength(MAX_TODOS_SENT);
+    // t60 is done, so the newest 50 open ones are t10 to t59, oldest first.
+    expect(refs[0]).toEqual({ id: 't10', text: 'to-do 10' });
+    expect(refs.at(-1)).toEqual({ id: 't59', text: 'to-do 59' });
+    expect(stored()).toHaveLength(60);
+  });
+
+  it('shortens a to-do stored before the length limit in the ref only (F-04)', () => {
+    const { storage, actions } = setup();
+    const long = 'x'.repeat(MAX_TODO_LENGTH + 50);
+    const todo = { id: 'old', text: long, done: false, createdAt: 1, doneAt: null };
+    storage.setItem(TODO_STORAGE_KEY, JSON.stringify({ version: 1, todos: [todo] }));
+
+    const [ref] = actions.openRefs();
+    expect(ref?.text).toHaveLength(MAX_TODO_LENGTH);
+    expect(ref?.text.endsWith('…')).toBe(true);
+    expect(storage.getItem(TODO_STORAGE_KEY)).toContain(long);
   });
 
   it('reports unreadable stored data once on restore, after removing it (Amendment 1)', () => {
