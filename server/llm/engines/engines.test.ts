@@ -2,6 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isChatError } from '../../../src/shared/llm/errors.ts';
 import type { ChatErrorCode } from '../../../src/shared/llm/protocol.ts';
+import { LLM_CONFIG } from '../config.ts';
+import { selectEngine } from '../engine.ts';
 import { IDLE_TIMEOUT } from '../errors.ts';
 import { anthropicEngine } from './anthropic.ts';
 import { mockEngine, mockIntent } from './mock.ts';
@@ -257,7 +259,7 @@ describe('anthropicEngine', () => {
 });
 
 describe('ollamaEngine', () => {
-  const options = { baseUrl: 'http://127.0.0.1:11434/', model: 'phi3' };
+  const options = { baseUrl: 'http://127.0.0.1:11434/', model: 'phi3', maxOutputTokens: 100 };
   const lines = (...chunks: object[]) => chunks.map((c) => JSON.stringify(c)).join('\n');
 
   it('puts the system prompt first and yields message content until done', async () => {
@@ -274,6 +276,19 @@ describe('ollamaEngine', () => {
         { role: 'user', content: 'Hi' },
       ],
     });
+  });
+
+  it('caps the output at LLM_CONFIG.maxOutputTokens with options.num_predict (F-03)', async () => {
+    const fetchImpl = respond(lines({ message: { content: 'ok' } }, { done: true }));
+    // The engine the app selects, so the test covers the wiring in selectEngine too.
+    vi.stubGlobal('fetch', fetchImpl);
+    try {
+      await collect(selectEngine({ INFERENCE_ENGINE: 'ollama' }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    const body = JSON.parse(vi.mocked(fetchImpl).mock.calls[0][1].body as string) as unknown;
+    expect(body).toMatchObject({ options: { num_predict: LLM_CONFIG.maxOutputTokens } });
   });
 
   it('reports "model_not_found" when the model is not pulled', async () => {
@@ -392,7 +407,12 @@ describe('ollamaEngine and to-dos (B-11)', () => {
       ].join('\n'),
     );
     const chunks = await all(
-      ollamaEngine({ baseUrl: 'http://127.0.0.1:11434/', model: 'phi3', fetchImpl }).stream({
+      ollamaEngine({
+        baseUrl: 'http://127.0.0.1:11434/',
+        model: 'phi3',
+        maxOutputTokens: 100,
+        fetchImpl,
+      }).stream({
         ...input(),
         messages: [{ role: 'user', content: 'Remind me to ask Ana how deploys work' }],
         todos: [{ id: 't1', text: 'read the style guide' }],

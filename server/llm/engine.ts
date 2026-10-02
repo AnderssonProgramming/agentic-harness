@@ -38,6 +38,7 @@ export function selectEngine(env: Env): Engine {
       return ollamaEngine({
         baseUrl: setting(env, 'OLLAMA_BASE_URL', LLM_CONFIG.ollamaBaseUrl),
         model: setting(env, 'OLLAMA_MODEL', LLM_CONFIG.ollamaModel),
+        maxOutputTokens: LLM_CONFIG.maxOutputTokens,
       });
     case 'mock':
       return mockEngine({

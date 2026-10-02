@@ -6,11 +6,17 @@ import type { Engine, FetchLike } from './types.ts';
 interface OllamaOptions {
   baseUrl: string;
   model: string;
+  maxOutputTokens: number;
   fetchImpl?: FetchLike;
 }
 
 /** A local model through Ollama's /api/chat, which streams one JSON object per line. */
-export function ollamaEngine({ baseUrl, model, fetchImpl = fetch }: OllamaOptions): Engine {
+export function ollamaEngine({
+  baseUrl,
+  model,
+  maxOutputTokens,
+  fetchImpl = fetch,
+}: OllamaOptions): Engine {
   return {
     name: 'ollama',
     model,
@@ -26,6 +32,8 @@ export function ollamaEngine({ baseUrl, model, fetchImpl = fetch }: OllamaOption
             model,
             stream: true,
             messages: [{ role: 'system', content: system }, ...messages],
+            // The same output cap as every engine (ADR-03); Ollama calls it num_predict (F-03).
+            options: { num_predict: maxOutputTokens },
           }),
           signal,
         });
