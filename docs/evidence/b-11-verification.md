@@ -104,3 +104,22 @@ The 8 pass-1 checks, plus "no engine notice". Parallel tool use is now enabled. 
 ### Regressions after Amendment 1
 
 All pass. `verify:persistence`: 8 of 8. `verify:chat`: 19 of 19. `verify:llm`: 10 of 10. `/api/chat` still answers only POST (`GET → 405`); the engine report lives on `/api/engine`. The live Anthropic call and the bundle secrets check also pass.
+
+## Amendment 2 (2026-10-02, Chrome/154.0.8037.93): the intermittent "No tool calling: notice" check
+
+### Root cause: the check, not the app
+
+In `engineWithoutActions`, the check read the engine notice once, straight after `seedAndReload()`. `reload()` only waits for `#composer-input`, and the composer renders before `GET /api/engine` answers (`useChat`'s mount effect, `use-chat.ts`, sets `engineActions` only when `engineInfo()` resolves; until then it is `null` and `TodoNotices` hides the notice). Under load the response came after the read, so the check saw an empty notice. The app is correct whatever the order: `setEngineActions((known) => known ?? info.actions)` never lets a late engine-info overwrite a `start` event, and both answers come from the same server.
+
+### Reproduction (commit `b6ff449`)
+
+The MOCK_TOOLS=off scenario now injects a fetch wrapper before the app loads (`Page.addScriptToEvaluateOnNewDocument`) that holds the page's `GET /api/engine` response back for 1,500 ms on every load. With the old check, `verify:todos` failed every time on the same check, with the same symptom as the PO's run: `"No tool calling: notice" … pass: false, detail: ""`.
+
+### Fix (commit `06e701c`)
+
+The check waits for the notice to show (`noticeShown()`, 10 s timeout). On timeout it fails with `the "engine" notice did not show within 10000 ms (last text: "…")` instead of aborting the script. The delay stays in the scenario as a regression guard.
+
+### Reliability after the fix
+
+- `npm run verify:todos`: **10 of 10 consecutive runs pass**, 19 of 19 checks each. No failures seen.
+- `vitest run` (through `npm test`): **5 of 5 consecutive runs pass**, 256 of 256 tests in 28 files each. No failures seen. The intermittent unit test from pass 2 didn't recur, so its cause is still unknown.
