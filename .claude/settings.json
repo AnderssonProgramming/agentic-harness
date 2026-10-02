@@ -13,7 +13,12 @@
       "Skill(llm-connect)",
       "Bash(node .claude/skills/llm-connect/scaffold.mjs:*)",
       "Bash(npm run verify:llm)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Skill(audit)",
+      "Bash(npm run audit:facts)",
+      "Bash(npm run audit:validate:*)",
+      "Bash(npm run verify:todos)",
+      "Bash(npm run verify:persistence:*)"
     ],
     "deny": [
       "Read(./node_modules/**)",
