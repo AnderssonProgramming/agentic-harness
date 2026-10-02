@@ -1,4 +1,5 @@
 import { chatError } from '../../src/shared/llm/errors.ts';
+import { fitHistory } from '../../src/shared/llm/history-budget.ts';
 import {
   MAX_MESSAGE_LENGTH,
   MAX_TODO_ID_LENGTH,
@@ -70,35 +71,12 @@ export function parseChatRequest(body: unknown): ChatTurn[] {
  * "bad_request" (back-to-back user messages would otherwise bypass the per-message cap, IN-02).
  */
 export function trimHistory(messages: readonly ChatTurn[], maxChars: number): ChatTurn[] {
-  const merged: ChatTurn[] = [];
-  for (const turn of messages) {
-    if (turn.content.trim() === '') continue;
-    const previous = merged.at(-1);
-    if (previous?.role === turn.role) {
-      merged[merged.length - 1] = {
-        role: turn.role,
-        content: `${previous.content}\n\n${turn.content}`,
-      };
-    } else {
-      merged.push({ ...turn });
-    }
-  }
-
-  const newest = merged.at(-1);
-  if (newest !== undefined && newest.content.length > maxChars) {
+  const fitted = fitHistory(messages, maxChars);
+  if (!fitted.fits) {
     throw chatError(
       'bad_request',
       `The newest message, merged with the unanswered ones before it, is longer than ${String(maxChars)} characters`,
     );
   }
-
-  const kept: ChatTurn[] = [];
-  let used = 0;
-  for (const turn of [...merged].reverse()) {
-    if (used + turn.content.length > maxChars) break;
-    kept.unshift(turn);
-    used += turn.content.length;
-  }
-  while (kept[0]?.role === 'assistant') kept.shift();
-  return kept;
+  return fitted.turns;
 }
