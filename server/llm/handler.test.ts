@@ -10,7 +10,9 @@ import {
 } from '../../src/shared/llm/limits.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import type { Env } from './engine.ts';
-import type { Engine, EngineStreamInput } from './engines/types.ts';
+import { anthropicEngine } from './engines/anthropic.ts';
+import { ollamaEngine } from './engines/ollama.ts';
+import type { Engine, EngineStreamInput, FetchLike } from './engines/types.ts';
 import { createChatHandler, createEngineInfoHandler } from './handler.ts';
 
 let server: Server | undefined;
@@ -240,6 +242,94 @@ describe('chat handler', () => {
       type: 'done',
     });
     expect(engine.calls).toHaveLength(1);
+  });
+
+  describe('token usage log (F-05)', () => {
+    const question = 'How do we name feature branches here?';
+    const ask = { messages: [{ role: 'user', content: question }] };
+    const usageLines = (log: { mock: { calls: unknown[][] } }) =>
+      log.mock.calls
+        .map((args) => args.map(String).join(' '))
+        .filter((line) => line.startsWith('[llm] usage'));
+    const fakeFetch =
+      (body: string): FetchLike =>
+      () =>
+        Promise.resolve(new Response(body, { status: 200 }));
+
+    it.each([
+      [
+        'anthropic',
+        () =>
+          anthropicEngine({
+            apiKey: 'sk-test-secret',
+            model: 'claude-test',
+            maxOutputTokens: 100,
+            fetchImpl: fakeFetch(
+              [
+                { type: 'message_start', message: { usage: { input_tokens: 1234 } } },
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Use feat/' } },
+                { type: 'message_delta', usage: { output_tokens: 56 } },
+                { type: 'message_stop' },
+              ]
+                .map((e) => `event: x\ndata: ${JSON.stringify(e)}\n\n`)
+                .join(''),
+            ),
+          }),
+        '[llm] usage engine=anthropic model=claude-test input=1234 output=56',
+      ],
+      [
+        'ollama',
+        () =>
+          ollamaEngine({
+            baseUrl: 'http://127.0.0.1:11434',
+            model: 'phi3',
+            maxOutputTokens: 100,
+            fetchImpl: fakeFetch(
+              [
+                { message: { content: 'Use feat/' } },
+                { done: true, prompt_eval_count: 321, eval_count: 45 },
+              ]
+                .map((c) => JSON.stringify(c))
+                .join('\n'),
+            ),
+          }),
+        '[llm] usage engine=ollama model=phi3 input=321 output=45',
+      ],
+      ['mock', undefined, '[llm] usage engine=mock model=echo input=0 output=0'],
+    ])(
+      'logs exactly one line with the %s numbers, no content or key',
+      async (_name, engineFor, expected) => {
+        const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const url = await start({
+          env: () => mockEnv,
+          ...(engineFor ? { engineFor: () => engineFor() } : {}),
+        });
+        const events = await post(url, ask);
+        expect(events.at(-1)).toEqual({ type: 'done' });
+        expect(events.map((e) => e.type)).not.toContain('usage');
+        expect(usageLines(log)).toEqual([expected]);
+        const everything = log.mock.calls.flat().join('\n');
+        expect(everything).not.toContain(question);
+        expect(everything).not.toContain('Use feat/');
+        expect(everything).not.toContain('sk-test-secret');
+      },
+    );
+
+    it('logs zeros for a to-do request held back from an engine without actions', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const url = await start({ env: () => ({ ...mockEnv, MOCK_TOOLS: 'off' }) });
+      await post(url, { messages: [{ role: 'user', content: "What's on my list?" }] });
+      expect(usageLines(log)).toEqual(['[llm] usage engine=mock model=echo input=0 output=0']);
+    });
+
+    it('logs no usage line for a reply that fails', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const url = await start({ env: () => mockEnv });
+      const events = await post(url, { messages: [{ role: 'user', content: 'x [mock:quota]' }] });
+      expect(events.at(-1)).toMatchObject({ type: 'error' });
+      expect(usageLines(log)).toEqual([]);
+    });
   });
 
   it('rejects methods other than POST', async () => {

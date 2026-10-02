@@ -8,7 +8,7 @@ import { IDLE_TIMEOUT } from '../errors.ts';
 import { anthropicEngine } from './anthropic.ts';
 import { mockEngine, mockIntent } from './mock.ts';
 import { ollamaEngine } from './ollama.ts';
-import type { Engine, EngineChunk, FetchLike } from './types.ts';
+import type { Engine, EngineChunk, FetchLike, TokenUsage } from './types.ts';
 
 const input = (signal = new AbortController().signal) => ({
   system: 'Be brief.',
@@ -54,6 +54,9 @@ async function errorCode(promise: Promise<unknown>): Promise<ChatErrorCode> {
   }
   throw new Error('Expected the engine to fail');
 }
+
+/** What an engine reports when the provider gave no token counts, and what the mock reports. */
+const NO_USAGE: TokenUsage = { type: 'usage', input: 0, output: 0 };
 
 const sse = (...events: object[]) =>
   events.map((e) => `event: x\ndata: ${JSON.stringify(e)}\n\n`).join('');
@@ -149,6 +152,7 @@ describe('anthropicEngine', () => {
     expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
       'Sure.',
       { kind: 'complete', id: 't1', query: 'the deploy one' },
+      NO_USAGE,
     ]);
   });
 
@@ -174,6 +178,7 @@ describe('anthropicEngine', () => {
       { kind: 'add', text: 'read the guide' },
       { kind: 'complete', id: null, query: 'the VPN one' },
       { kind: 'list' },
+      NO_USAGE,
     ]);
   });
 
@@ -193,7 +198,25 @@ describe('anthropicEngine', () => {
         { type: 'message_stop' },
       ),
     );
-    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([action]);
+    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
+      action,
+      NO_USAGE,
+    ]);
+  });
+
+  it('reports the usage from message_start and message_delta, last (F-05)', async () => {
+    const fetchImpl = respond(
+      sse(
+        { type: 'message_start', message: { usage: { input_tokens: 1234, output_tokens: 1 } } },
+        { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hi' } },
+        { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 56 } },
+        { type: 'message_stop' },
+      ),
+    );
+    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
+      'Hi',
+      { type: 'usage', input: 1234, output: 56 },
+    ]);
   });
 
   it('reports "malformed" for a tool call with bad input or an unknown tool (B-11)', async () => {
@@ -291,6 +314,16 @@ describe('ollamaEngine', () => {
     expect(body).toMatchObject({ options: { num_predict: LLM_CONFIG.maxOutputTokens } });
   });
 
+  it('reports prompt_eval_count and eval_count from the done chunk as usage, last (F-05)', async () => {
+    const fetchImpl = respond(
+      lines({ message: { content: 'Hi' } }, { done: true, prompt_eval_count: 321, eval_count: 45 }),
+    );
+    expect(await all(ollamaEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
+      'Hi',
+      { type: 'usage', input: 321, output: 45 },
+    ]);
+  });
+
   it('reports "model_not_found" when the model is not pulled', async () => {
     const fetchImpl = respond('{"error":"model \\"phi9\\" not found, try pulling it first"}', 404);
     expect(await errorCode(collect(ollamaEngine({ ...options, fetchImpl })))).toBe(
@@ -360,7 +393,7 @@ describe('mockEngine', () => {
         messages: [{ role: 'user', content: 'Remind me to ask Ana how deploys work.' }],
       }),
     );
-    expect(chunks).toEqual([{ kind: 'add', text: 'ask Ana how deploys work' }]);
+    expect(chunks).toEqual([{ kind: 'add', text: 'ask Ana how deploys work' }, NO_USAGE]);
   });
 });
 
@@ -384,6 +417,7 @@ describe('mockIntent (B-11)', () => {
     expect(chunks).toEqual([
       { kind: 'add', text: 'read the guide' },
       { kind: 'complete', id: null, query: 'the VPN one' },
+      NO_USAGE,
     ]);
   });
 
@@ -393,7 +427,8 @@ describe('mockIntent (B-11)', () => {
     const chunks = await all(
       engine.stream({ ...input(), messages: [{ role: 'user', content: 'Remind me to x' }] }),
     );
-    expect(chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
+    expect(chunks.at(-1)).toEqual(NO_USAGE);
+    expect(chunks.slice(0, -1).every((chunk) => typeof chunk === 'string')).toBe(true);
     expect(mockEngine({ delayMs: 0 }).actions).toBe(true);
   });
 });
@@ -418,7 +453,7 @@ describe('ollamaEngine and to-dos (B-11)', () => {
         todos: [{ id: 't1', text: 'read the style guide' }],
       }),
     );
-    expect(chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
+    expect(chunks).toEqual(['I cannot manage your list.', NO_USAGE]);
     const body = JSON.parse(vi.mocked(fetchImpl).mock.calls[0][1].body as string) as Record<
       string,
       unknown

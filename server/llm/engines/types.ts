@@ -10,8 +10,18 @@ export interface EngineStreamInput {
   signal: AbortSignal;
 }
 
-/** Text to show, or a to-do action the model requested (ADR-11). */
-export type EngineChunk = string | TodoAction;
+/**
+ * The tokens the provider reported for one reply (F-05). Each engine yields exactly one, last,
+ * when the reply completes; zeros when the provider reported nothing. Logged, never sent.
+ */
+export interface TokenUsage {
+  type: 'usage';
+  input: number;
+  output: number;
+}
+
+/** Text to show, a to-do action the model requested (ADR-11), or the reply's token usage. */
+export type EngineChunk = string | TodoAction | TokenUsage;
 
 /** One provider. stream() yields chunks and throws a ChatError on any failure. */
 export interface Engine {

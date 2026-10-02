@@ -56,7 +56,15 @@ export function ollamaEngine({
           ) {
             yield chunk.message.content;
           }
-          if (chunk.done === true) return;
+          if (chunk.done === true) {
+            // The final chunk carries the token counts (F-05).
+            yield {
+              type: 'usage',
+              input: typeof chunk.prompt_eval_count === 'number' ? chunk.prompt_eval_count : 0,
+              output: typeof chunk.eval_count === 'number' ? chunk.eval_count : 0,
+            };
+            return;
+          }
         }
       } catch (error) {
         if (isChatError(error)) throw error;

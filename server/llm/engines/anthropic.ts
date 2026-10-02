@@ -8,7 +8,7 @@ import {
   upstreamFailure,
 } from '../errors.ts';
 import { actionFromToolUse, TODO_TOOLS, todoContext } from '../todo-tools.ts';
-import type { Engine, FetchLike } from './types.ts';
+import type { Engine, FetchLike, TokenUsage } from './types.ts';
 
 interface AnthropicOptions {
   apiKey: string;
@@ -61,6 +61,13 @@ export function anthropicEngine({
       let data: string[] = [];
       // A tool call arrives as content_block_start, input_json_delta fragments, content_block_stop.
       const toolCalls = new Map<number, { name: string; json: string }>();
+      // message_start carries the input tokens; message_delta the cumulative output tokens.
+      const usage: TokenUsage = { type: 'usage', input: 0, output: 0 };
+      const readUsage = (value: unknown) => {
+        if (!isRecord(value)) return;
+        if (typeof value.input_tokens === 'number') usage.input = value.input_tokens;
+        if (typeof value.output_tokens === 'number') usage.output = value.output_tokens;
+      };
       try {
         for await (const line of readLines(response.body, signal)) {
           if (line.startsWith('data:')) {
@@ -73,7 +80,11 @@ export function anthropicEngine({
           if (!isRecord(event)) continue;
 
           const index = typeof event.index === 'number' ? event.index : -1;
-          if (event.type === 'content_block_start' && isRecord(event.content_block)) {
+          if (event.type === 'message_start' && isRecord(event.message)) {
+            readUsage(event.message.usage);
+          } else if (event.type === 'message_delta') {
+            readUsage(event.usage);
+          } else if (event.type === 'content_block_start' && isRecord(event.content_block)) {
             const block = event.content_block;
             if (block.type === 'tool_use' && typeof block.name === 'string') {
               toolCalls.set(index, { name: block.name, json: '' });
@@ -111,6 +122,7 @@ export function anthropicEngine({
               typeof message === 'string' ? message : '',
             );
           } else if (event.type === 'message_stop') {
+            yield usage;
             return;
           }
         }

@@ -2,7 +2,10 @@ import { chatError } from '../../../src/shared/llm/errors.ts';
 import { isChatErrorCode, type TodoAction } from '../../../src/shared/llm/protocol.ts';
 import { todoPhraseActions } from '../../../src/shared/llm/todo-phrases.ts';
 import { IDLE_TIMEOUT } from '../errors.ts';
-import type { Engine } from './types.ts';
+import type { Engine, TokenUsage } from './types.ts';
+
+/** No model is called, so no tokens are used (F-05). */
+const NO_USAGE: TokenUsage = { type: 'usage', input: 0, output: 0 };
 
 /**
  * The mock's stand-in for tool calling (ADR-11): the same to-do actions a model would request,
@@ -75,6 +78,7 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
         for (const action of actions) yield action;
         // Like a model finishing its turn after a tool call, so the pending card is observable.
         await wait();
+        yield NO_USAGE;
         return;
       }
       const userTurns = messages.filter((turn) => turn.role === 'user').length;
@@ -83,6 +87,7 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
         await wait();
         yield word;
       }
+      yield NO_USAGE;
     },
   };
 }

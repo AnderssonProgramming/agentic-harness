@@ -4,7 +4,7 @@ import type { EngineInfo, StreamEvent } from '../../src/shared/llm/protocol.ts';
 import { isTodoRequest } from '../../src/shared/llm/todo-phrases.ts';
 import { LLM_CONFIG } from './config.ts';
 import { selectEngine, type Env } from './engine.ts';
-import type { Engine } from './engines/types.ts';
+import type { Engine, TokenUsage } from './engines/types.ts';
 import { IDLE_TIMEOUT } from './errors.ts';
 import { parseChatRequest, parseTodoRefs, trimHistory } from './history.ts';
 import { SYSTEM_PROMPT } from './system-prompt.ts';
@@ -14,6 +14,18 @@ interface ChatHandlerOptions {
   env: () => Env;
   engineFor?: (env: Env) => Engine;
   idleTimeoutMs?: number;
+}
+
+const NO_TOKENS: TokenUsage = { type: 'usage', input: 0, output: 0 };
+
+/**
+ * One line per completed reply, for measuring cost (F-05). Names and counts only: never message
+ * content or keys (ERR-03), and never sent to the browser (the protocol doesn't change).
+ */
+function logUsage(engine: Engine, usage: TokenUsage): void {
+  console.log(
+    `[llm] usage engine=${engine.name} model=${engine.model} input=${String(usage.input)} output=${String(usage.output)}`,
+  );
 }
 
 async function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> {
@@ -118,9 +130,11 @@ export function createChatHandler({
       // request never reaches it; the browser shows the app's refusal instead (ADR-11).
       if (!engine.actions && isTodoRequest(messages.at(-1)?.content ?? '')) {
         send({ type: 'done' });
+        logUsage(engine, NO_TOKENS);
         return;
       }
       restartIdleTimer();
+      let usage = NO_TOKENS;
       for await (const chunk of engine.stream({
         system: SYSTEM_PROMPT,
         messages,
@@ -128,13 +142,12 @@ export function createChatHandler({
         signal: upstream.signal,
       })) {
         restartIdleTimer();
-        send(
-          typeof chunk === 'string'
-            ? { type: 'delta', text: chunk }
-            : { type: 'action', action: chunk },
-        );
+        if (typeof chunk === 'string') send({ type: 'delta', text: chunk });
+        else if ('type' in chunk) usage = chunk;
+        else send({ type: 'action', action: chunk });
       }
       send({ type: 'done' });
+      logUsage(engine, usage);
     } catch (error) {
       const failure = isChatError(error)
         ? error
