@@ -60,6 +60,31 @@ Baseline: every fresh session starts at **about 30,000 tokens** before any work 
   - added "headless → foreground" and "measure after every turn" to the routine
   - resumed across a 2-hour usage-limit outage by compacting with the interrupted step's state
 
+## Session 5: blind delegation of B-11 to the subagent, three passes (2026-10-01 → 02)
+
+- **Task:** build B-11 from a delegation contract, one fresh `feature-builder` session per pass (`docs/evidence/b-11-delegation-record.md`).
+- **Size:**
+
+  | Pass | Turns | Time   | Context peak       | Cost     |
+  | ---- | ----- | ------ | ------------------ | -------- |
+  | 1    | 224   | 24 min | **199,418** tokens | USD 5.65 |
+  | 2    | 266   | 26 min | **232,524**        | USD 6.74 |
+  | 3    | 62    | 17 min | 81,106             | USD 1.46 |
+
+  No compaction in any pass.
+
+- **What it loaded:** whole-delegation passes, in one reply each. Pass 2's tool results alone were 279,862 characters.
+- **When it started failing:** quality held in the code, but **verification discipline slipped**. In pass 2, at the high end of its context, the agent saw a test fail once, reran it, and moved on: "a second failing test I didn't identify". That same pass shipped a check that was flaky under load.
+- **Symptom:** an intermittent failure normalized as noise, which is a quiet version of "it degraded and you didn't notice".
+- **What I did:**
+  - a narrow Amendment 2 (root cause, deterministic reproduction, 10 passing runs), which pass 3 met at 81k tokens
+  - new rules: size passes to the budget; treat intermittent failures as findings
+
+## Session 6: the orchestrating session, again (2026-10-01 → 02)
+
+- **Signal:** **it repeated a corrected error for the fifth time.** An inline `node -` script with regex backslashes was mangled by the shell, so one ADR commit didn't land. The correction has been in memory and in this log since Sprint 2 ("use the file tool for anything with backslashes").
+- **What I did:** switched to the Edit tool for the change. The rule itself was already right; the session failed to apply it. That matches the routine's diagnosis: in a session this long, an old correction gets buried. It's another reason the PO session should stay thin and delegate. This sprint's code was all written by subagents, but the orchestrator still wrote scripts for its own checks.
+
 ## The pattern
 
 | Cause                                                                                    | Seen in                                     | Cost                                                            |

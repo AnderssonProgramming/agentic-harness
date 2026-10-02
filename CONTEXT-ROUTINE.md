@@ -64,3 +64,23 @@ Used from Sprint 3 on, when the PO's session must not do the coding:
 5. **Check the context after every turn** (`npm run context:profile -- turn.jsonl`, last value). Over 80k, send `/compact keep: <plan file>, <decisions>, steps done with their commits, next step, rules files>` before the next step. Don't let it slide: in the long-session test it reached 125k before anyone looked.
 6. If a turn is cut off mid-step (usage limit, crash), resume by compacting with "step N was interrupted; partial changes in <files>", then "continue step N". Don't start over.
 7. At the end, profile the transcripts and add anything new to `CONTEXT-LOG.md`.
+
+## Delegating to a subagent (blind delegation)
+
+From Sprint 3 week 6 on. Here the PO doesn't steer turn by turn: the subagent (`claude -p --agent feature-builder`) runs a whole contract in one reply.
+
+1. **Contract first.** Write it in `docs/delegations/<item>-<slug>.md`, in three parts:
+   - the minimal context, as a file list
+   - the decisions that aren't up for debate
+   - the criteria as observable behavior, plus limits
+
+   Don't leave any of the three out.
+
+2. **Size each pass to the budget.** Nobody compacts a subagent mid-reply. B-11's first two passes peaked at 199k and 232k tokens, while a narrow third pass stayed at 81k and cost a quarter as much. If a contract has more than about 5 steps, or touches more than one layer (server, shared, feature, verification), split it into a first pass and amendments.
+3. **Each pass gets a fresh session.** The contract and git history carry the state. Don't resume a 200k session.
+4. **Verify independently, never from the report:**
+   - `check` several times in a row, to catch flakiness
+   - every `verify:*` once **under load** (run the test suite concurrently), because races hide on an idle machine
+   - every engine a criterion names, **live**
+5. **Answer with the contract, not the code.** An unmet criterion or a decision you overrule becomes an amendment with behavioral criteria and an evidence list, followed by a new pass. Fixing the code by hand means the delegation failed. Record it as the finding.
+6. **Read the decisions list first.** It's where the agent crossed into product territory, e.g. silent data loss or dropped requests.
