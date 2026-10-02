@@ -140,3 +140,23 @@ Written by the `feature-builder` subagent before the first code change of this p
 | A3  | To-do feature: an `unsupported` card, the store reports a reset of unreadable data, `restore()` on the public surface, a `TodoNotices` component (engine notice, reset notice)                                                                                                                                                  | `src/features/todos/**`                                                                                                 | 1, 2 (to-do side)  |
 | A4  | Chat: `Message.actions` (a list), snapshot version 3 with a tested migration from 2, every action run in order with its own card, refusal cards when the engine can't run actions, the engine notice from `GET /api/engine` and `start`, the reset notice once                                                                  | `src/features/chat/**`                                                                                                  | 1, 2, 3            |
 | A5  | `verify:todos` scenarios (a) no-tools notice and refusal with byte-identical storage, (b) reset notice once, (c) two actions, two cards; one live Ollama run; evidence and backlog                                                                                                                                              | `scripts/verify-todos.mjs`, `docs/evidence/b-11-verification.md`, `BACKLOG.md`                                          | Evidence           |
+
+## Amendment 2 (after pass 2, approved by the PO on 2026-10-02)
+
+### Why
+
+In the PO's independent verification of pass 2, `npm run verify:todos` failed **1 of 4 runs**, on the check "No tool calling: notice" (the standing notice wasn't there). The failing run was right after five back-to-back test runs, with the machine under load. The other three runs passed 19/19. Pass 2's own report also mentions "a second failing test I didn't identify; it passed on every rerun". A check that sometimes fails isn't evidence, and neither is rerunning until it passes.
+
+### Acceptance criteria for this pass
+
+1. **Root cause, with evidence.** Decide whether this is an app race (for example, the notice depends on the timing of `GET /api/engine` against the first `start` event, so it can be missed or overwritten) or a check that waits wrongly (a fixed delay instead of waiting for a condition). Explain it in the report, citing the code.
+2. **Reproduce it deterministically before fixing it.** Add a way to force the bad ordering, for example a mock-only delay on the engine-info response, and a `verify:todos` scenario or unit test that fails before the fix and passes after.
+3. **Fix the cause.**
+   - **If it's the app:** the notice must be correct whatever order the responses arrive in.
+   - **If it's the check:** it must wait for the condition, with a timeout and a clear failure message.
+   - Commit the fix on its own (`fix:`), per CLAUDE.md's self-correction loop.
+4. **Reliability evidence.** `npm run verify:todos` passes **10 consecutive runs**, plus `npx vitest run` 5 consecutive runs. Report the counts. Any failure you see in that time goes in the report with its full name, even if a rerun passes.
+
+### Limits
+
+The same as pass 2. The B-11 criteria don't change. If you find the intermittent unit test from pass 2, treat it the same way (root cause, then fix), as a separate commit.
