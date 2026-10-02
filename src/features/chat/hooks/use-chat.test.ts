@@ -61,14 +61,17 @@ function fakeStore(
 /** A to-do list the test controls: what's open, and the card each action produces. */
 function fakeTodos(card: TodoCard = { kind: 'listed', todos: [] }) {
   const todos: TodoActions = {
+    restore: vi.fn(() => ({ reset: false })),
     openRefs: vi.fn(() => [{ id: 't1', text: 'ask Ana how deploys work' }]),
     execute: vi.fn(() => card),
   };
   return todos;
 }
 
+const unknownEngine = () => Promise.resolve(null);
+
 function renderChat(send: SendChat, store = fakeStore().store, todos = fakeTodos()) {
-  return renderHook(() => useChat({ send, store, todos }));
+  return renderHook(() => useChat({ send, store, todos, engineInfo: unknownEngine }));
 }
 
 const savedConversation: readonly Message[] = [
@@ -79,7 +82,7 @@ const savedConversation: readonly Message[] = [
     createdAt: 1_000,
     status: 'done',
     error: null,
-    action: null,
+    actions: [],
   },
   {
     id: 'id-2',
@@ -88,7 +91,7 @@ const savedConversation: readonly Message[] = [
     createdAt: 1_000,
     status: 'stopped',
     error: null,
-    action: null,
+    actions: [],
   },
 ];
 
@@ -210,7 +213,7 @@ describe('useChat', () => {
       expect(result.current.messages.at(-1)).toMatchObject({
         text: '',
         status: 'streaming',
-        action: { status: 'pending', request: { kind: 'add' } },
+        actions: [{ status: 'pending', request: { kind: 'add' } }],
       });
       expect(todos.execute).not.toHaveBeenCalled();
 
@@ -222,17 +225,20 @@ describe('useChat', () => {
       expect(result.current.messages.at(-1)).toMatchObject({
         text: '',
         status: 'done',
-        action: { status: 'settled', card: added },
+        actions: [{ status: 'settled', card: added }],
       });
-      expect(state.saved?.at(-1)?.action).toEqual({ status: 'settled', card: added });
+      expect(state.saved?.at(-1)?.actions).toEqual([{ status: 'settled', card: added }]);
     });
 
-    it('runs only the first action of a reply', async () => {
+    it('runs every action of a reply in order, each with its own card (Amendment 1)', async () => {
       const model = controllableSend();
+      const { store, state } = fakeStore();
+      const listed: TodoCard = { kind: 'listed', todos: [] };
       const todos = fakeTodos(added);
-      const { result } = renderChat(model.send, fakeStore().store, todos);
+      vi.mocked(todos.execute).mockReturnValueOnce(added).mockReturnValueOnce(listed);
+      const { result } = renderChat(model.send, store, todos);
       act(() => {
-        result.current.send('Remind me to ask Ana how deploys work');
+        result.current.send('Remind me to ask Ana how deploys work. What is on my list?');
       });
       await act(async () => {
         model.last().options.onAction?.({ kind: 'add', text: 'ask Ana how deploys work' });
@@ -240,8 +246,104 @@ describe('useChat', () => {
         model.last().finish();
         await Promise.resolve();
       });
-      expect(todos.execute).toHaveBeenCalledTimes(1);
-      expect(todos.execute).toHaveBeenCalledWith({ kind: 'add', text: 'ask Ana how deploys work' });
+      expect(vi.mocked(todos.execute).mock.calls).toEqual([
+        [{ kind: 'add', text: 'ask Ana how deploys work' }],
+        [{ kind: 'list' }],
+      ]);
+      const cards = [
+        { status: 'settled', card: added },
+        { status: 'settled', card: listed },
+      ];
+      expect(result.current.messages.at(-1)).toMatchObject({ status: 'done', actions: cards });
+      expect(state.saved?.at(-1)?.actions).toEqual(cards);
+    });
+
+    describe('with an engine that cannot run actions (Amendment 1)', () => {
+      const noActions = { engine: 'ollama', model: 'phi3', actions: false };
+
+      it('shows the engine notice before the first message, and hides it for an engine with actions', async () => {
+        const { result } = renderHook(() =>
+          useChat({
+            send: vi.fn(),
+            store: fakeStore().store,
+            todos: fakeTodos(),
+            engineInfo: () => Promise.resolve(noActions),
+          }),
+        );
+        expect(result.current.engineActions).toBeNull();
+        await waitFor(() => {
+          expect(result.current.engineActions).toBe(false);
+        });
+
+        const model = controllableSend();
+        const other = renderChat(model.send);
+        act(() => {
+          other.result.current.send('Hi');
+          model.last().options.onStart?.({ engine: 'mock', model: 'echo', actions: true });
+        });
+        expect(other.result.current.engineActions).toBe(true);
+      });
+
+      it('replies to a to-do phrase with refusal cards and never touches the list', async () => {
+        const model = controllableSend();
+        const { store, state } = fakeStore();
+        const todos = fakeTodos();
+        const { result } = renderChat(model.send, store, todos);
+        act(() => {
+          result.current.send("Remind me to ask Ana how deploys work. What's on my list?");
+        });
+        await act(async () => {
+          model.last().options.onStart?.(noActions);
+          model.last().finish();
+          await Promise.resolve();
+        });
+        expect(todos.execute).not.toHaveBeenCalled();
+        const refused = [
+          { status: 'settled', card: { kind: 'unsupported', action: 'add' } },
+          { status: 'settled', card: { kind: 'unsupported', action: 'list' } },
+        ];
+        expect(result.current.messages.at(-1)).toMatchObject({
+          text: '',
+          status: 'done',
+          actions: refused,
+        });
+        expect(state.saved?.at(-1)?.actions).toEqual(refused);
+        expect(result.current.engineActions).toBe(false);
+      });
+
+      it('lets other wording reach the model as before', async () => {
+        const model = controllableSend();
+        const { result } = renderChat(model.send);
+        act(() => {
+          result.current.send('Can you remind me how deploys work?');
+        });
+        await act(async () => {
+          model.last().options.onStart?.(noActions);
+          model.last().options.onDelta('You run the deploy script.');
+          model.last().finish();
+          await Promise.resolve();
+        });
+        expect(result.current.messages.at(-1)).toMatchObject({
+          text: 'You run the deploy script.',
+          status: 'done',
+          actions: [],
+        });
+      });
+    });
+
+    it('says once that an unreadable to-do list was reset, until a new conversation (Amendment 1)', () => {
+      const todos = fakeTodos();
+      vi.mocked(todos.restore).mockReturnValueOnce({ reset: true });
+      const { result } = renderChat(vi.fn(), fakeStore().store, todos);
+      expect(result.current.todosReset).toBe(true);
+      expect(todos.restore).toHaveBeenCalledTimes(1);
+      act(() => {
+        result.current.send('Hi');
+      });
+      act(() => {
+        result.current.clear();
+      });
+      expect(result.current.todosReset).toBe(false);
     });
 
     it.each([
@@ -260,7 +362,7 @@ describe('useChat', () => {
         await Promise.resolve();
       });
       expect(todos.execute).not.toHaveBeenCalled();
-      expect(result.current.messages.at(-1)).toMatchObject({ status, action: null });
+      expect(result.current.messages.at(-1)).toMatchObject({ status, actions: [] });
     });
 
     it('gives the next turn the card as context', async () => {
@@ -302,7 +404,7 @@ describe('useChat', () => {
       expect(result.current.messages.at(-1)).toMatchObject({
         text: 'Ask your team.',
         status: 'done',
-        action: null,
+        actions: [],
       });
       expect(todos.execute).not.toHaveBeenCalled();
     });

@@ -13,6 +13,11 @@ import {
 import { todoStore, type TodoStore } from './todo-store';
 
 export interface TodoActions {
+  /**
+   * Loads the stored list once when Compass opens. `reset` is true when it was unreadable and
+   * has just been removed, so the chat can say so once (B-11, like B-08's conversation reset).
+   */
+  restore: () => { reset: boolean };
   /** The open to-dos to send to the model; empty if storage can't be read. */
   openRefs: () => TodoRef[];
   /** Runs an action on stored data and returns the card to show. Never throws. */
@@ -50,6 +55,10 @@ export function createTodoActions(
   };
 
   return {
+    restore: () => {
+      const loaded = store.load();
+      return { reset: loaded.ok && loaded.reset };
+    },
     openRefs: () => {
       const loaded = store.load();
       return loaded.ok ? openRefs(loaded.todos) : [];

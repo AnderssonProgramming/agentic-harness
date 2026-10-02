@@ -13,8 +13,8 @@ export interface Message {
   createdAt: number;
   status: MessageStatus;
   error: ChatErrorInfo | null;
-  /** A to-do action the reply requested, and then the app's card for it (B-11, ADR-11). */
-  action: TodoActionState | null;
+  /** The to-do actions the reply requested, in order, each then replaced by its card (B-11, ADR-11). */
+  actions: TodoActionState[];
 }
 
 export interface MessageSource {
@@ -61,7 +61,7 @@ export function startExchange(
     createdAt: source.now(),
     status: 'done',
     error: null,
-    action: null,
+    actions: [],
   };
   const reply: Message = {
     id: source.newId(),
@@ -70,7 +70,7 @@ export function startExchange(
     createdAt: source.now(),
     status: 'streaming',
     error: null,
-    action: null,
+    actions: [],
   };
   return { messages: [...messages, user, reply], replyId: reply.id };
 }
@@ -86,7 +86,7 @@ function updateReply(
 /** Text that arrives after a to-do action is dropped: only the app's card speaks for it (ADR-11). */
 export function appendToReply(messages: readonly Message[], replyId: string, text: string) {
   return updateReply(messages, replyId, (reply) =>
-    reply.action ? reply : { ...reply, text: reply.text + text },
+    reply.actions.length > 0 ? reply : { ...reply, text: reply.text + text },
   );
 }
 
@@ -95,31 +95,41 @@ export function finishReply(messages: readonly Message[], replyId: string) {
 }
 
 /**
- * The reply asked for a to-do action: its card shows as pending, and any text the model streamed
- * is dropped, so it can't confirm anything on its own (B-11). Only the first action counts.
+ * The reply asked for a to-do action: a pending card is added after any earlier ones, and any
+ * text the model streamed is dropped, so it can't confirm anything on its own (B-11).
  */
 export function startAction(messages: readonly Message[], replyId: string, request: TodoAction) {
-  return updateReply(messages, replyId, (reply) =>
-    reply.action ? reply : { ...reply, text: '', action: { status: 'pending', request } },
-  );
-}
-
-/** The app ran the action: the reply is done and shows the card built from storage. */
-export function settleAction(messages: readonly Message[], replyId: string, card: TodoCard) {
   return updateReply(messages, replyId, (reply) => ({
     ...reply,
-    status: 'done',
-    action: { status: 'settled', card },
+    text: '',
+    actions: [...reply.actions, { status: 'pending', request }],
   }));
 }
 
-/** Keeps any partial text. A user's Stop is "stopped", not an error. A pending action never runs. */
+/**
+ * The app ran the reply's actions, or refused them: the reply is done and shows one card per
+ * action, in order, each built by the app (ADR-11). Model text never stands beside them.
+ */
+export function settleActions(
+  messages: readonly Message[],
+  replyId: string,
+  cards: readonly TodoCard[],
+) {
+  return updateReply(messages, replyId, (reply) => ({
+    ...reply,
+    text: '',
+    status: 'done',
+    actions: cards.map((card) => ({ status: 'settled', card })),
+  }));
+}
+
+/** Keeps any partial text. A user's Stop is "stopped", not an error. Pending actions never run. */
 export function failReply(messages: readonly Message[], replyId: string, error: ChatErrorInfo) {
   return updateReply(messages, replyId, (reply) => {
-    const action = reply.action?.status === 'pending' ? null : reply.action;
+    const actions = reply.actions.filter((action) => action.status !== 'pending');
     return error.code === 'aborted'
-      ? { ...reply, status: 'stopped', action }
-      : { ...reply, status: 'error', error, action };
+      ? { ...reply, status: 'stopped', actions }
+      : { ...reply, status: 'error', error, actions };
   });
 }
 
@@ -130,13 +140,29 @@ export function resetReply(messages: readonly Message[], replyId: string) {
     text: '',
     status: 'streaming',
     error: null,
-    action: null,
+    actions: [],
   }));
 }
 
-/** What the model reads for a message: the text, or for a to-do action the app's card (B-11). */
+/** What the model reads for a message: the text, or for to-do actions the app's cards (B-11). */
 function turnContent(message: Message): string {
-  return message.action?.status === 'settled' ? cardSummary(message.action.card) : message.text;
+  const cards = message.actions.flatMap((action) =>
+    action.status === 'settled' ? [cardSummary(action.card)] : [],
+  );
+  return cards.length > 0 ? cards.join('\n\n') : message.text;
+}
+
+/**
+ * The user's side of the turn being answered: the trailing user messages of the history, joined
+ * the way the server merges them, so browser and server judge the same text (ADR-11).
+ */
+export function lastUserTurn(history: readonly ChatTurn[]): string {
+  const trailing: string[] = [];
+  for (const turn of [...history].reverse()) {
+    if (turn.role !== 'user') break;
+    if (turn.content.trim() !== '') trailing.unshift(turn.content);
+  }
+  return trailing.join('\n\n');
 }
 
 /**

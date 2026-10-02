@@ -48,6 +48,17 @@
   text-decoration: none;
 }
 
+/* Standing notices about the to-do list, styled like the chat's storage notice. */
+.todo-notice {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .todo-card {
     transition: none;

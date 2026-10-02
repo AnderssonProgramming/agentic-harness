@@ -10,8 +10,18 @@ interface ReplyBodyProps {
 }
 
 export function ReplyBody({ message, isLast, onRetry }: ReplyBodyProps) {
-  // A to-do action replaces the reply's text with the app's card (B-11, ADR-11).
-  if (message.action) return <TodoActionCard state={message.action} />;
+  // To-do actions replace the reply's text with the app's cards, one per action (B-11, ADR-11).
+  if (message.actions.length > 0) {
+    return (
+      <>
+        {message.actions.map((action, index) => (
+          // Actions are only ever appended, so the position is a stable key and a pending card
+          // stays the same element when it settles.
+          <TodoActionCard key={index} state={action} />
+        ))}
+      </>
+    );
+  }
   if (message.status === 'streaming' && message.text === '') {
     return (
       <p className="message__text">

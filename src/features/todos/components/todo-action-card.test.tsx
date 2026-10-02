@@ -50,4 +50,15 @@ describe('TodoActionCard (B-11)', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save to your list");
   });
+
+  it('says a refused request was not done, and why (Amendment 1)', () => {
+    render(
+      <TodoActionCard
+        state={{ status: 'settled', card: { kind: 'unsupported', action: 'add' } }}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Not added: the current engine can't run to-do actions, so Compass didn't touch your list.",
+    );
+  });
 });

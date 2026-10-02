@@ -8,7 +8,7 @@ interface TodoActionCardProps {
 type Tone = 'pending' | 'success' | 'question' | 'failure';
 
 function toneOf(card: TodoCard): Tone {
-  if (card.kind === 'failed') return 'failure';
+  if (card.kind === 'failed' || card.kind === 'unsupported') return 'failure';
   if (card.kind === 'no-match' || card.kind === 'ambiguous') return 'question';
   return 'success';
 }

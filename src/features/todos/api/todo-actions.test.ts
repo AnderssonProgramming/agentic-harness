@@ -129,4 +129,27 @@ describe('to-do actions (B-11)', () => {
     actions.execute({ kind: 'complete', id: 't1', query: '' });
     expect(actions.openRefs()).toEqual([{ id: 't2', text: 'b' }]);
   });
+
+  it('reports unreadable stored data once on restore, after removing it (Amendment 1)', () => {
+    const { storage, actions } = setup();
+    expect(actions.restore()).toEqual({ reset: false });
+    storage.setItem(TODO_STORAGE_KEY, 'not json');
+    expect(actions.restore()).toEqual({ reset: true });
+    expect(storage.getItem(TODO_STORAGE_KEY)).toBeNull();
+    expect(actions.restore()).toEqual({ reset: false });
+  });
+
+  it('runs several actions in order, each on what the previous one stored', () => {
+    const { actions, stored } = setup();
+    const cards = [
+      actions.execute({ kind: 'add', text: 'read the guide' }),
+      actions.execute({ kind: 'add', text: 'set up the VPN' }),
+      actions.execute({ kind: 'complete', id: null, query: 'the VPN one' }),
+    ];
+    expect(cards.map((card) => card.kind)).toEqual(['added', 'added', 'completed']);
+    expect(stored()).toEqual([
+      expect.objectContaining({ text: 'read the guide', done: false }),
+      expect.objectContaining({ text: 'set up the VPN', done: true }),
+    ]);
+  });
 });

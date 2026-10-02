@@ -44,6 +44,12 @@ describe('to-do snapshot (B-11)', () => {
         card: { kind: 'failed', action: 'add', reason: 'full' },
       }),
     ).toBe(true);
+    expect(
+      isTodoActionState({ status: 'settled', card: { kind: 'unsupported', action: 'list' } }),
+    ).toBe(true);
+    expect(
+      isTodoActionState({ status: 'settled', card: { kind: 'unsupported', action: 'nap' } }),
+    ).toBe(false);
     expect(isTodoActionState({ status: 'settled', card: { kind: 'added' } })).toBe(false);
     expect(isTodoActionState({ status: 'done', card: { kind: 'listed', todos: [] } })).toBe(false);
     expect(isTodoActionState({ status: 'pending', request: { kind: 'delete' } })).toBe(false);

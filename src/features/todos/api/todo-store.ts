@@ -7,8 +7,9 @@ export type TodoStorageFailure = 'unavailable' | 'full';
 
 export type TodoSaveResult = { ok: true } | { ok: false; reason: TodoStorageFailure };
 
+/** `reset` is true when unreadable data was found and removed by this load. */
 export type TodoLoadResult =
-  { ok: true; todos: Todo[] } | { ok: false; reason: TodoStorageFailure };
+  { ok: true; todos: Todo[]; reset: boolean } | { ok: false; reason: TodoStorageFailure };
 
 export interface TodoStore {
   load: () => TodoLoadResult;
@@ -24,7 +25,7 @@ function toFailure(error: unknown): { ok: false; reason: TodoStorageFailure } {
 
 /**
  * The to-do list's only access to storage (ADR-10 pattern, ADR-11). Synchronous and never throws.
- * Unreadable data is removed and treated as an empty list.
+ * Unreadable data is removed, treated as an empty list, and reported once as `reset`.
  */
 export function createTodoStore(getStorage: () => Storage): TodoStore {
   return {
@@ -33,8 +34,9 @@ export function createTodoStore(getStorage: () => Storage): TodoStore {
         const storage = getStorage();
         const raw = storage.getItem(TODO_STORAGE_KEY);
         const todos = restoreTodos(raw);
-        if (todos === null && raw !== null) storage.removeItem(TODO_STORAGE_KEY);
-        return { ok: true, todos: todos ?? [] };
+        const reset = todos === null && raw !== null;
+        if (reset) storage.removeItem(TODO_STORAGE_KEY);
+        return { ok: true, todos: todos ?? [], reset };
       } catch (error) {
         return toFailure(error);
       }

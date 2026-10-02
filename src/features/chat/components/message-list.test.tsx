@@ -12,7 +12,7 @@ const user = (id: string, text: string): Message => ({
   createdAt: 1,
   status: 'done',
   error: null,
-  action: null,
+  actions: [],
 });
 const reply = (id: string, text: string, rest: Partial<Message> = {}): Message => ({
   id,
@@ -21,7 +21,7 @@ const reply = (id: string, text: string, rest: Partial<Message> = {}): Message =
   createdAt: 2,
   status: 'done',
   error: null,
-  action: null,
+  actions: [],
   ...rest,
 });
 
@@ -114,7 +114,7 @@ describe('MessageList', () => {
   it("shows the app's to-do card for a reply with an action, pending then settled (B-11)", () => {
     const pending = reply('r1', '', {
       status: 'streaming',
-      action: { status: 'pending', request: { kind: 'list' } },
+      actions: [{ status: 'pending', request: { kind: 'list' } }],
     });
     const { rerender } = render(
       <MessageList messages={[user('u1', "What's on my list?"), pending]} onRetry={vi.fn()} />,
@@ -123,11 +123,29 @@ describe('MessageList', () => {
     expect(screen.queryByLabelText('Compass is typing')).not.toBeInTheDocument();
 
     const settled = reply('r1', '', {
-      action: { status: 'settled', card: { kind: 'listed', todos: [] } },
+      actions: [{ status: 'settled', card: { kind: 'listed', todos: [] } }],
     });
     rerender(
       <MessageList messages={[user('u1', "What's on my list?"), settled]} onRetry={vi.fn()} />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('Your list is empty.');
+  });
+
+  it('shows one card per action of a reply, in order (Amendment 1)', () => {
+    const two = reply('r1', '', {
+      actions: [
+        {
+          status: 'settled',
+          card: { kind: 'added', todo: { id: 't1', text: 'read the guide', done: false } },
+        },
+        { status: 'settled', card: { kind: 'unsupported', action: 'list' } },
+      ],
+    });
+    const { container } = render(
+      <MessageList messages={[user('u1', 'x'), two]} onRetry={vi.fn()} />,
+    );
+    expect(
+      [...container.querySelectorAll('.todo-card')].map((card) => card.getAttribute('data-card')),
+    ).toEqual(['added', 'unsupported']);
   });
 });

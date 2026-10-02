@@ -50,6 +50,8 @@ export function isTodoCard(value: unknown): value is TodoCard {
       return typeof value.query === 'string' && isViewList(value.candidates);
     case 'failed':
       return ACTION_KINDS.includes(value.action) && FAILURES.includes(value.reason);
+    case 'unsupported':
+      return ACTION_KINDS.includes(value.action);
     default:
       return false;
   }

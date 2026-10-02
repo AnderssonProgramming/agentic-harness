@@ -6,7 +6,10 @@ import { sendChat, type SendChat } from '../api/chat-api';
 import { conversationStore } from '../api/conversation-store';
 import { ChatScreen } from './chat-screen';
 
-vi.mock('../api/chat-api', () => ({ sendChat: vi.fn() }));
+vi.mock('../api/chat-api', () => ({
+  sendChat: vi.fn(),
+  getEngineInfo: vi.fn(() => Promise.resolve(null)),
+}));
 const mockedSend = vi.mocked(sendChat);
 
 afterEach(() => {
@@ -94,10 +97,12 @@ describe('ChatScreen', () => {
     mockedSend.mockImplementation(echo);
     const user = userEvent.setup();
     render(<ChatScreen />);
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    // The storage notice comes first; the to-do notices follow it (B-11).
+    const storageNotice = () => screen.getAllByRole('status')[0];
+    expect(storageNotice()).toBeEmptyDOMElement();
 
     await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Hello{Enter}');
-    expect(screen.getByRole('status')).toHaveTextContent(/storage is full/);
+    expect(storageNotice()).toHaveTextContent(/storage is full/);
     await waitFor(() => {
       expect(within(screen.getByRole('log')).getAllByRole('listitem')[1]).toHaveTextContent(
         'Re: Hello',

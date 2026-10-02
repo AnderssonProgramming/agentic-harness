@@ -9,8 +9,9 @@ import {
   finishReply,
   historyBefore,
   isReplying,
+  lastUserTurn,
   resetReply,
-  settleAction,
+  settleActions,
   startAction,
   startExchange,
   type Message,
@@ -145,47 +146,85 @@ describe('to-do action lifecycle (B-11)', () => {
     return { replyId, pending };
   }
 
-  it('drops the model text when an action arrives, and ignores text and actions after it', () => {
+  it('drops the model text when an action arrives, ignores text after it, and keeps every action in order', () => {
     const { replyId, pending } = withAction();
     expect(pending[1]).toMatchObject({
       text: '',
       status: 'streaming',
-      action: { status: 'pending', request: { kind: 'add' } },
+      actions: [{ status: 'pending', request: { kind: 'add' } }],
     });
     const later = startAction(appendToReply(pending, replyId, 'Done!'), replyId, { kind: 'list' });
-    expect(later[1]).toEqual(pending[1]);
-  });
-
-  it('settles the reply with the card', () => {
-    const { replyId, pending } = withAction();
-    expect(settleAction(pending, replyId, card)[1]).toMatchObject({
-      status: 'done',
-      action: { status: 'settled', card },
+    expect(later[1]).toMatchObject({
+      text: '',
+      actions: [
+        { status: 'pending', request: { kind: 'add' } },
+        { status: 'pending', request: { kind: 'list' } },
+      ],
     });
   });
 
-  it('drops a pending action when the reply fails or is stopped', () => {
+  it('settles the reply with one card per action, in order', () => {
+    const { replyId, pending } = withAction();
+    const listed: TodoCard = { kind: 'listed', todos: [] };
+    const two = startAction(pending, replyId, { kind: 'list' });
+    expect(settleActions(two, replyId, [card, listed])[1]).toMatchObject({
+      status: 'done',
+      actions: [
+        { status: 'settled', card },
+        { status: 'settled', card: listed },
+      ],
+    });
+  });
+
+  it('settles a refused request with the refusal cards and no model text (Amendment 1)', () => {
+    const started = startExchange([], 'Remind me to ask Ana', fakeSource());
+    if (!started) throw new Error('expected a start');
+    const refused: TodoCard = { kind: 'unsupported', action: 'add' };
+    expect(settleActions(started.messages, started.replyId, [refused])[1]).toMatchObject({
+      text: '',
+      status: 'done',
+      actions: [{ status: 'settled', card: refused }],
+    });
+  });
+
+  it('drops pending actions when the reply fails or is stopped', () => {
     const { replyId, pending } = withAction();
     expect(failReply(pending, replyId, chatError('network', 'x').info)[1]).toMatchObject({
       status: 'error',
-      action: null,
+      actions: [],
     });
     expect(failReply(pending, replyId, chatError('aborted', 'x').info)[1]).toMatchObject({
       status: 'stopped',
-      action: null,
+      actions: [],
     });
   });
 
-  it("sends a settled card to the model as the reply's text", () => {
+  it("sends the settled cards to the model as the reply's text", () => {
     const { replyId, pending } = withAction();
-    const settled = settleAction(pending, replyId, card);
+    const settled = settleActions(pending, replyId, [card, { kind: 'listed', todos: [] }]);
     expect(historyBefore(settled, 'none')).toEqual([
       { role: 'user', content: 'Remind me to ask Ana how deploys work' },
       {
         role: 'assistant',
-        content: "[The app's to-do list] Added to your list: ask Ana how deploys work",
+        content:
+          "[The app's to-do list] Added to your list: ask Ana how deploys work\n\n[The app's to-do list] Your list is empty.",
       },
     ]);
+  });
+});
+
+describe('lastUserTurn (Amendment 1)', () => {
+  it('joins the trailing user turns the way the server merges them', () => {
+    expect(
+      lastUserTurn([
+        { role: 'user', content: 'Remind me to x' },
+        { role: 'assistant', content: 'ok' },
+        { role: 'user', content: 'First' },
+        { role: 'user', content: ' ' },
+        { role: 'user', content: 'Remind me to y' },
+      ]),
+    ).toBe('First\n\nRemind me to y');
+    expect(lastUserTurn([])).toBe('');
   });
 });
 

@@ -131,7 +131,7 @@ The same report format as pass 1, including a fresh "Decisions I made that this 
 
 ### Plan (Amendment 1)
 
-Written by the `feature-builder` subagent before the first code change of this pass. One commit per step, each after `npm run format` and `npm run -s check`.
+Written by the `feature-builder` subagent before the first code change of this pass. One commit per step, each after `npm run format` and `npm run -s check`. A3 and A4 share one commit: A3's `unsupported` card changes a stored type, and CLAUDE.md requires the snapshot bump (A4) in the same commit.
 
 | #   | Step                                                                                                                                                                                                                                                                                                                            | Files                                                                                                                   | Corrected behavior |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------ |

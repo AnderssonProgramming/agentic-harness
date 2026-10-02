@@ -24,7 +24,9 @@ export type TodoCard =
   | { kind: 'completed'; todo: TodoView }
   | { kind: 'no-match'; query: string }
   | { kind: 'ambiguous'; query: string; candidates: TodoView[] }
-  | { kind: 'failed'; action: TodoAction['kind']; reason: TodoFailure };
+  | { kind: 'failed'; action: TodoAction['kind']; reason: TodoFailure }
+  /** The engine can't run to-do actions, so the request was refused and nothing was touched. */
+  | { kind: 'unsupported'; action: TodoAction['kind'] };
 
 /** The action part of a reply: requested and waiting for the stream to end, or run. */
 export type TodoActionState =
@@ -33,6 +35,11 @@ export type TodoActionState =
 export interface TodoSource {
   newId: () => string;
   now: () => number;
+}
+
+/** The app's refusal of a to-do request the active engine can't run (ADR-11, Amendment 1). */
+export function unsupportedCard(action: TodoAction): TodoCard {
+  return { kind: 'unsupported', action: action.kind };
 }
 
 export function toView({ id, text, done }: Todo): TodoView {
@@ -146,8 +153,16 @@ export function cardTitle(card: TodoCard): string {
       return card.action === 'list'
         ? `Couldn't read your list: ${FAILURE_TEXT[card.reason]}.`
         : `Couldn't save to your list: ${FAILURE_TEXT[card.reason]}. Nothing was changed.`;
+    case 'unsupported':
+      return `${UNSUPPORTED_TEXT[card.action]}: the current engine can't run to-do actions, so Compass didn't touch your list.`;
   }
 }
+
+const UNSUPPORTED_TEXT: Record<TodoAction['kind'], string> = {
+  add: 'Not added',
+  list: 'Not shown',
+  complete: 'Not marked as done',
+};
 
 /** The card as one block of text, so the next turn's model knows what the app did. */
 export function cardSummary(card: TodoCard): string {

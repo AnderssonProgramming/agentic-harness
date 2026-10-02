@@ -16,7 +16,7 @@ function message(overrides: Partial<Message>): Message {
     createdAt: 1_000,
     status: 'done',
     error: null,
-    action: null,
+    actions: [],
     ...overrides,
   };
 }
@@ -81,52 +81,89 @@ describe('restoreSnapshot', () => {
       }),
     ],
     ['an unknown older version', '{"version":0,"items":[]}'],
-    ['a future version', '{"version":3,"messages":[]}'],
+    ['a future version', '{"version":4,"messages":[]}'],
     [
       'a to-do card that is not valid',
       JSON.stringify({
-        version: 2,
-        messages: [{ ...message({}), action: { status: 'settled', card: { kind: 'added' } } }],
+        version: 3,
+        messages: [{ ...message({}), actions: [{ status: 'settled', card: { kind: 'added' } }] }],
       }),
     ],
+    [
+      'a version-2 to-do card that is not valid',
+      JSON.stringify({
+        version: 2,
+        messages: [
+          {
+            ...message({}),
+            actions: undefined,
+            action: { status: 'settled', card: { kind: 'x' } },
+          },
+        ],
+      }),
+    ],
+    ['actions that are not a list', toSnapshot([{ ...message({}), actions: null } as never])],
     ['a version that is not a number', '{"version":"1","messages":[]}'],
   ])('starts empty and reports a reset for %s', (_case, raw) => {
     expect(restoreSnapshot(raw)).toEqual({ messages: [], outcome: 'reset' });
   });
 
-  it('migrates version 1 (B-08) to version 2 by giving every message no action (B-11)', () => {
-    // Version 1 serialized the same fields, minus `action`.
+  const card = {
+    status: 'settled' as const,
+    card: {
+      kind: 'added' as const,
+      todo: { id: 't1', text: 'ask Ana how deploys work', done: false },
+    },
+  };
+
+  /** How version 2 stored a message: `action`, a single state or null, instead of `actions`. */
+  const asVersion2 = ({ actions, ...rest }: Message) => ({ ...rest, action: actions[0] ?? null });
+
+  it('migrates version 1 (B-08) through version 2 to 3: every message gets no actions (B-11)', () => {
+    // Version 1 serialized the same fields, minus the to-do actions.
     const raw = JSON.stringify({ version: 1, messages: conversation }, (key, value: unknown) =>
-      key === 'action' ? undefined : value,
+      key === 'actions' ? undefined : value,
     );
-    expect(raw).not.toContain('"action"');
+    expect(raw).not.toContain('"action');
     expect(restoreSnapshot(raw)).toEqual({ messages: conversation, outcome: 'restored' });
   });
 
-  it('round-trips a settled to-do card and drops one still pending after a restart (B-11)', () => {
-    const card = {
+  it('migrates version 2 to 3: a stored action becomes a one-card list (Amendment 1)', () => {
+    const withCard = [
+      message({ id: 'id-1', text: 'Remind me to ask Ana how deploys work' }),
+      message({ id: 'id-2', author: 'assistant', text: '', actions: [card] }),
+      message({ id: 'id-3', text: 'Hi' }),
+      message({ id: 'id-4', author: 'assistant', text: 'Hello' }),
+    ];
+    const raw = JSON.stringify({ version: 2, messages: withCard.map(asVersion2) });
+    expect(raw).toContain(`"action":${JSON.stringify(card)}`);
+    expect(restoreSnapshot(raw)).toEqual({ messages: withCard, outcome: 'restored' });
+  });
+
+  it('round-trips several settled cards and drops pending ones after a restart (B-11)', () => {
+    const refused = {
       status: 'settled' as const,
-      card: {
-        kind: 'added' as const,
-        todo: { id: 't1', text: 'ask Ana how deploys work', done: false },
-      },
+      card: { kind: 'unsupported' as const, action: 'add' as const },
     };
     const raw = toSnapshot([
       message({ id: 'id-1' }),
-      message({ id: 'id-2', author: 'assistant', text: '', action: card }),
+      message({ id: 'id-2', author: 'assistant', text: '', actions: [card, refused] }),
       message({ id: 'id-3' }),
       message({
         id: 'id-4',
         author: 'assistant',
         text: '',
         status: 'streaming',
-        action: { status: 'pending', request: { kind: 'list' } },
+        actions: [
+          { status: 'pending', request: { kind: 'list' } },
+          { status: 'pending', request: { kind: 'add', text: 'x' } },
+        ],
       }),
     ]);
     const { messages } = restoreSnapshot(raw);
-    expect(JSON.parse(raw)).toMatchObject({ version: 2 });
-    expect(messages[1]?.action).toEqual(card);
-    expect(messages[3]).toMatchObject({ status: 'stopped', action: null });
+    expect(JSON.parse(raw)).toMatchObject({ version: 3 });
+    expect(messages[1]?.actions).toEqual([card, refused]);
+    expect(messages[3]).toMatchObject({ status: 'stopped', actions: [] });
   });
 
   it('migrates a known older version', () => {
@@ -134,7 +171,9 @@ describe('restoreSnapshot', () => {
       ...CONVERSATION_MIGRATIONS,
       0: (data) => ({ version: 1, messages: data.items }),
     };
-    const raw = JSON.stringify({ version: 0, items: conversation });
+    const raw = JSON.stringify({ version: 0, items: conversation }, (key, value: unknown) =>
+      key === 'actions' ? undefined : value,
+    );
     expect(restoreSnapshot(raw, migrations)).toEqual({
       messages: conversation,
       outcome: 'restored',

@@ -15,10 +15,10 @@ describe('to-do store (B-11)', () => {
   it('loads an empty list, then what it saved, under compass.todos', () => {
     const storage = fakeStorage();
     const store = createTodoStore(() => storage);
-    expect(store.load()).toEqual({ ok: true, todos: [] });
+    expect(store.load()).toEqual({ ok: true, todos: [], reset: false });
     expect(store.save(todos)).toEqual({ ok: true });
     expect(JSON.parse(storage.getItem(TODO_STORAGE_KEY) ?? '')).toEqual({ version: 1, todos });
-    expect(store.load()).toEqual({ ok: true, todos });
+    expect(store.load()).toEqual({ ok: true, todos, reset: false });
   });
 
   it('reports blocked storage as "unavailable" without throwing', () => {
@@ -34,13 +34,15 @@ describe('to-do store (B-11)', () => {
       fakeStorage({ setItem: throwing('QuotaExceededError') }, items),
     );
     expect(full.save([])).toEqual({ ok: false, reason: 'full' });
-    expect(full.load()).toEqual({ ok: true, todos });
+    expect(full.load()).toEqual({ ok: true, todos, reset: false });
   });
 
-  it('removes unreadable data and starts with an empty list', () => {
+  it('removes unreadable data, starts with an empty list, and reports the reset once', () => {
     const storage = fakeStorage();
     storage.setItem(TODO_STORAGE_KEY, '{"version":1,"todos":[{"broken"');
-    expect(createTodoStore(() => storage).load()).toEqual({ ok: true, todos: [] });
+    const store = createTodoStore(() => storage);
+    expect(store.load()).toEqual({ ok: true, todos: [], reset: true });
     expect(storage.getItem(TODO_STORAGE_KEY)).toBeNull();
+    expect(store.load()).toEqual({ ok: true, todos: [], reset: false });
   });
 });

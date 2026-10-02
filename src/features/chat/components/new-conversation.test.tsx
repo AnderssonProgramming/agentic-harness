@@ -12,7 +12,7 @@ const messages: readonly Message[] = [
     createdAt: 1_000,
     status: 'done',
     error: null,
-    action: null,
+    actions: [],
   },
 ];
 
