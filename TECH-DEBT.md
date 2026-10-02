@@ -32,3 +32,16 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Where:** `AUDIT-CRITERIA.md`, IN-01 and ERR-02. Their methods check single requests, through the `verify:*` scripts.
 - **Why not now:** changing the criteria between the before and after runs would break the comparison this sprint needs.
 - **When to fix:** in the next audit cycle (after week 8). Add a method to ERR-02 that runs a deterministic property-style test over many request shapes **and sequences**, like `server/llm/prompt-invariants.test.ts`, and a check that a conversation past the body limit keeps working.
+
+## [D-05] `verify:chat` fails if its screenshot folder doesn't exist
+
+- **Risk:** Low (harness)
+- **Where:** `scripts/verify-chat.mjs:154`. It writes screenshots without creating the folder, so it gets `ENOENT` after the first 4 checks. The audit noted it three times. It's the most likely cause of the one unexplained `verify:chat` exit 1 in the PO's regression run of 2026-10-02, whose output was lost to a bug in the PO's runner.
+- **Why not now:** with an existing folder it passes (19/19, including under load), and the audit skill passes the system temp folder.
+- **When to fix:** with week 8's deployment script, which will run the verifiers in CI-like conditions.
+
+## [D-06] Each committed audit report adds SEC-01 noise
+
+- **Risk:** Low (harness)
+- **Where:** `scripts/audit-facts.mjs`. The secret scan counts the fake keys that every report quotes (10 → 12 hits). The auditor's judgment is unchanged ("fake fixtures"), but the number grows with every run.
+- **When to fix:** in the next audit cycle. Exclude `docs/audit/` and `AUDIT-REPORT.md` from `secrets.tracked`, but still scan them in `secrets.history` for real keys.
