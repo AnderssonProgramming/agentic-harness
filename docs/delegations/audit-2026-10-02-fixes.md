@@ -110,3 +110,25 @@ Written by the `feature-builder` subagent. Tests are written first and run again
 | 2    | F-04 (LLM-05) | `src/shared/llm/limits.ts` `MAX_TODO_ID_LENGTH` (36, a UUID); `history.ts` `parseTodoRefs` rejects longer ids; `todo-tools.ts` named bound on what the server adds + `systemWithTodos`; `anthropic.ts` uses it; `handler.ts` guard; tests             | LLM-05 invariant, bypass reproduction |
 | 3    | both          | `server/llm/prompt-invariants.test.ts`: fixed-table property test over counts, lengths, consecutive roles and ids with a recording engine, asserting both invariants on what the engine receives (or that the engine isn't called when `bad_request`) | Property-style evidence               |
 | 4    | all           | `npm run -s check`, every `verify:*` with screenshots in a temp folder                                                                                                                                                                                | No regression                         |
+
+## Amendment 2 (after fix pass 2, approved by the PO on 2026-10-02)
+
+### Why
+
+The property-style test written for Amendment 1 found **P-01** (ERR-02, High; see `docs/audit/triage-2026-10-02.md`, Addendum):
+
+- an oversized body poisons the keep-alive connection, and the next request hangs;
+- the browser sends the whole conversation, so long conversations pass the body limit in normal use.
+
+The PO approves fixing both. Stopping and asking was the right call.
+
+### Acceptance criteria
+
+- [ ] **Server:** when a body is over `maxRequestBytes`, the client gets the `bad_request` error event and the connection is closed (`connection: close`, with the request drained or destroyed), so **no later request hangs**. Evidence: a handler test with an oversized body, then two more requests on the same agent or pool, both answered. It must fail on the current code.
+- [ ] **Browser:** a request never carries more history than the server can use. The browser sends only the newest messages that fit `historyChars`, with the same merge-aware counting the server uses, plus the to-do refs within their limits. A conversation of any length keeps working. Evidence: a unit test that builds a 300 KB conversation and asserts the request body is under the limit and contains the newest messages; and a `verify:chat` or `verify:persistence` style check, or a test, showing a long conversation still gets replies.
+- [ ] **Commit `server/llm/prompt-invariants.test.ts`** with its generator unrestricted, covering bodies over the limit, so it passes because the defect is fixed, not because it's avoided. It must pass 5 consecutive runs.
+- [ ] **No regression:** `npm run -s check`, and every `verify:*` with screenshots in a temp folder.
+
+### Limits
+
+The same as the original. One commit per fix, naming **P-01** and the criterion (`ERR-02`). **Don't run the audit skill.**

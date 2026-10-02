@@ -25,3 +25,10 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Where:** `server/llm/handler.ts`, the `error` event's `message`. For example `anthropic HTTP 401: {"type":"error",…}` reaches the client, and `failReply` keeps it in the stored conversation. The UI shows only `describeChatError`, so nothing leaks on screen (ERR-01 is met).
 - **Why not now:** no keys or user content are in those bodies (`verify:llm` scans for keys), and it's visible only in DevTools on the user's own machine. Fixing it means changing what the protocol carries (ADR-09).
 - **When to fix:** when the app is exposed to users other than its owner (after week 8's deployment). At that point, add **ERR-04** to AUDIT-CRITERIA.md: "Provider error details never leave the server; the browser receives only the code and engine."
+
+## [D-04] The audit criteria can't see failures that need sequences or scale (lesson from P-01)
+
+- **Risk:** Medium (applies to the audit, not to the product)
+- **Where:** `AUDIT-CRITERIA.md`, IN-01 and ERR-02. Their methods check single requests, through the `verify:*` scripts.
+- **Why not now:** changing the criteria between the before and after runs would break the comparison this sprint needs.
+- **When to fix:** in the next audit cycle (after week 8). Add a method to ERR-02 that runs a deterministic property-style test over many request shapes **and sequences**, like `server/llm/prompt-invariants.test.ts`, and a check that a conversation past the body limit keeps working.
