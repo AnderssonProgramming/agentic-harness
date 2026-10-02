@@ -159,3 +159,31 @@ Acceptance criteria (observable behavior; "stored" means what's in the browser's
 - **Evidence:** unit tests for intent mapping, execution and failure, plus a browser check that reads storage directly, including a restart.
 
 Status: in progress
+
+### [B-12] "What's on my list?" answered from storage on every engine
+
+As a junior developer using the local engine, I want to see my saved to-dos when I ask for them, because the list is on my machine and doesn't need a model to read it.
+
+Acceptance criteria:
+
+- With an engine that can't run actions, "What's on my list?" shows the stored to-dos, the same card as with Claude, read from storage. The model isn't called.
+- Adding or completing on such an engine is still refused, as now (B-11 Amendment 1).
+- Evidence: a `verify:todos` scenario with `MOCK_TOOLS=off` that compares the card with storage.
+
+Origin: the PO's ADR-11 review, correction 3. The B-11 amendment said "not performed" for every phrase, and that contradicted the feature's own principle (data, not model).
+
+Status: pending
+
+### [B-13] The local engine's first reply doesn't time out while the model loads
+
+As a junior developer on the local engine, I want my first question to be answered even when the model is still loading, so switching to Ollama (B-04) works on the first try.
+
+Acceptance criteria:
+
+- The first reply from a cold Ollama model on CPU gets a longer wait for its first chunk than the 20 s idle timeout. The idle timeout between chunks is unchanged.
+- While waiting, the typing indicator stays visible, and a stalled engine still ends in the `timeout` error.
+- Evidence: a test with a fake engine whose first chunk is slow, and a live run with Ollama loading cold.
+
+Origin: the PO's ADR-11 review, correction 4. The first `phi3` reply timed out twice in week 6.
+
+Status: pending
