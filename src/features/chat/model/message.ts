@@ -1,3 +1,4 @@
+import { MAX_MESSAGE_LENGTH } from '../../../shared/llm/limits';
 import type { ChatErrorInfo, ChatTurn, TodoAction } from '../../../shared/llm/protocol';
 import { cardSummary, type TodoActionState, type TodoCard } from '../../todos';
 
@@ -25,7 +26,7 @@ export interface MessageSource {
 export type DraftCheck =
   { valid: true; text: string } | { valid: false; reason: 'empty' | 'too-long' };
 
-export const MAX_MESSAGE_LENGTH = 4000;
+export { MAX_MESSAGE_LENGTH };
 
 export function checkDraft(draft: string): DraftCheck {
   const text = draft.trim();

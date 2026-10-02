@@ -1,4 +1,5 @@
 import { chatError } from '../../src/shared/llm/errors.ts';
+import { MAX_MESSAGE_LENGTH } from '../../src/shared/llm/limits.ts';
 import { isTodoRef, type ChatTurn, type TodoRef } from '../../src/shared/llm/protocol.ts';
 import { isRecord } from './errors.ts';
 
@@ -25,6 +26,13 @@ export function parseChatRequest(body: unknown): ChatTurn[] {
       throw chatError(
         'bad_request',
         `messages[${String(index)}] must be { role: "user" | "assistant", content: string }`,
+      );
+    }
+    // The browser never sends a longer message (checkDraft); anything longer skipped the UI.
+    if (item.role === 'user' && item.content.length > MAX_MESSAGE_LENGTH) {
+      throw chatError(
+        'bad_request',
+        `messages[${String(index)}] is longer than ${String(MAX_MESSAGE_LENGTH)} characters`,
       );
     }
     return { role: item.role, content: item.content };

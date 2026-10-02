@@ -62,3 +62,16 @@ Read only these:
 4. The final `npm run -s check` result.
 
 **Don't run the audit skill.** The PO runs it after reviewing your work.
+
+## Plan
+
+Written by the `feature-builder` subagent. One commit per finding, in triage order.
+
+| Step | Finding | Files                                                                                                                                                                                   | Criterion covered                                                           |
+| ---- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1    | F-01    | new `src/shared/llm/limits.ts` (the three limits); `chat/model/message.ts` re-exports `MAX_MESSAGE_LENGTH` from it; `server/llm/history.ts` rejects a user turn over it; handler tests  | F-01: 4,001 → `bad_request`, engine not invoked; 4,000 passes               |
+| 2    | F-04    | `server/llm/history.ts` `parseTodoRefs` rejects > 50 refs or a text > 200; `todos/model/todo.ts` `openRefs` sends the 50 newest open to-dos; handler and model tests                    | F-04: 50/51 refs, 200/201 chars, 60 open → 50 newest                        |
+| 3    | F-02    | `todos/model/todo.ts` `checkTodoText` used by `addTodo`, new failure reason `too-long`; `todo-snapshot.ts` accepts it; conversation snapshot v3 → v4 (identity migration + test); tests | F-02: over-long add stores nothing, failure card says it's too long         |
+| 4    | F-03    | `server/llm/engine.ts` passes `maxOutputTokens` to Ollama; `engines/ollama.ts` sends `options.num_predict`; engine test                                                                 | F-03: request body carries the cap                                          |
+| 5    | F-05    | `engines/types.ts` (usage chunk), `anthropic.ts`, `ollama.ts`, `mock.ts` report usage; `handler.ts` logs one line on `done`; engine and handler tests                                   | F-05: one usage line per completed reply, provider numbers, no message text |
+| 6    | all     | `npm run -s check`, `verify:llm`, `verify:todos`, `verify:persistence`, `verify:chat` (temp screenshot folder), `audit:validate`                                                        | No regression                                                               |

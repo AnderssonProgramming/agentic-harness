@@ -3,9 +3,10 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatError } from '../../src/shared/llm/errors.ts';
+import { MAX_MESSAGE_LENGTH } from '../../src/shared/llm/limits.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import type { Env } from './engine.ts';
-import type { Engine } from './engines/types.ts';
+import type { Engine, EngineStreamInput } from './engines/types.ts';
 import { createChatHandler, createEngineInfoHandler } from './handler.ts';
 
 let server: Server | undefined;
@@ -37,6 +38,22 @@ async function post(url: string, body: unknown): Promise<StreamEvent[]> {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as StreamEvent);
+}
+
+/** An engine that records every call it gets and answers "ok". */
+function spyEngine(): Engine & { calls: EngineStreamInput[] } {
+  const calls: EngineStreamInput[] = [];
+  return {
+    name: 'mock',
+    model: 'spy',
+    actions: true,
+    calls,
+    async *stream(input) {
+      calls.push(input);
+      await Promise.resolve();
+      yield 'ok';
+    },
+  };
 }
 
 const mockEnv: Env = { INFERENCE_ENGINE: 'mock', MOCK_DELAY_MS: '0' };
@@ -145,6 +162,37 @@ describe('chat handler', () => {
       type: 'error',
       error: { code: 'bad_request' },
     });
+  });
+
+  it('rejects a user message over 4,000 characters without calling the engine (F-01)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const ask = (content: string) => post(url, { messages: [{ role: 'user', content }] });
+
+    expect((await ask('a'.repeat(MAX_MESSAGE_LENGTH + 1))).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect(engine.calls).toHaveLength(0);
+
+    expect((await ask('a'.repeat(MAX_MESSAGE_LENGTH))).at(-1)).toEqual({ type: 'done' });
+    expect(engine.calls).toHaveLength(1);
+  });
+
+  it('rejects an over-long earlier user message too (F-01)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const events = await post(url, {
+      messages: [
+        { role: 'user', content: 'a'.repeat(MAX_MESSAGE_LENGTH + 1) },
+        { role: 'assistant', content: 'ok' },
+        { role: 'user', content: 'Hi' },
+      ],
+    });
+    expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'bad_request' } });
+    expect(engine.calls).toHaveLength(0);
   });
 
   it('rejects methods other than POST', async () => {
