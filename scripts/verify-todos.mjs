@@ -64,6 +64,23 @@ const notice = (name) =>
     const el = document.querySelector('[data-notice="${name}"]');
     return { text: el?.textContent ?? '', shown: !!el && el.classList.contains('todo-notice') };
   })()`);
+// Waits for a notice to show. On timeout it returns the notice's last state with a message,
+// so the check fails with a reason instead of aborting the script.
+async function noticeShown(name, timeoutMs = 10_000) {
+  try {
+    await page.waitFor(
+      `document.querySelector('[data-notice="${name}"]')?.classList.contains('todo-notice') === true`,
+      timeoutMs,
+    );
+  } catch {
+    const last = await notice(name);
+    return {
+      ...last,
+      timedOut: `the "${name}" notice did not show within ${String(timeoutMs)} ms (last text: "${last.text}")`,
+    };
+  }
+  return notice(name);
+}
 // Env is read when the dev server starts, so switching the engine means a new server.
 async function restartApp(env) {
   await app.close();
@@ -131,14 +148,15 @@ async function engineWithoutActions(label, replyTimeoutMs, { engineInfoDelayMs =
     "document.querySelector('[data-notice=\"engine\"]')?.classList.contains('todo-notice')",
   );
   await seedAndReload(TODOS, SEEDED_TODOS);
-  const shown = await notice('engine');
+  // The composer renders before GET /api/engine answers, so wait for the notice, never read once.
+  const shown = await noticeShown('engine');
   check(
     'No tool calling: notice',
     `${label}: the standing notice says the list can't be changed and saved to-dos are safe`,
     shown.shown &&
       shown.text ===
         "Compass can't change your to-do list with the current engine. Your saved to-dos are safe.",
-    shown.text,
+    shown.timedOut ?? shown.text,
   );
 
   const before = await stored(TODOS);
