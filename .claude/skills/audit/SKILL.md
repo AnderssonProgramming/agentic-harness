@@ -2,7 +2,7 @@
 name: audit
 description: Runs the project's security and performance audit against AUDIT-CRITERIA.md and writes a risk-classified report in a fixed format, so two runs can be compared. Use before every deployment, after fixing findings, or when asked to "run the audit" or "/audit". Do NOT use to fix findings (that's a delegation per finding), or for an open-ended "review my code".
 argument-hint: (no arguments)
-allowed-tools: Read, Grep, Glob, Write, Bash(npm run audit:facts), Bash(npm run audit:validate:*), Bash(npm run verify:chat:*), Bash(npm run verify:persistence:*), Bash(npm run verify:todos), Bash(npm run verify:llm), Bash(git rev-parse:*), Bash(git log:*), Bash(git show:*)
+allowed-tools: Read, Grep, Glob, Write, Bash(npm run format), Bash(npm run audit:facts), Bash(npm run audit:validate:*), Bash(npm run verify:chat:*), Bash(npm run verify:persistence:*), Bash(npm run verify:todos), Bash(npm run verify:llm), Bash(git rev-parse:*), Bash(git log:*), Bash(git show:*)
 ---
 
 # audit
@@ -43,8 +43,9 @@ Run every command from the repository root in its plain form: one per call, no c
 4. Go through the criteria **in order, one by one**, using each criterion's "How to check". For code-reading checks, `Grep` first, then `Read` only the lines you need. Cite **file:line** for every claim.
 5. **Don't add criteria.** Anything you notice outside the list goes under "Observations outside the criteria", never in Findings, and never changes the counts.
 6. Write the report to `AUDIT-REPORT.md` in exactly the format below. Also save a copy to `docs/audit/<YYYY-MM-DD>-<short commit>.md`, so later runs can be compared.
-7. Run `npm run audit:validate`. If it reports problems, fix the **report** (never the code) and rerun until it's valid.
-8. Report back: the counts by risk, each Critical and High finding in one line, and the validation result. **Don't fix anything and don't commit.** Fixing is the PO's decision, through a separate delegation per finding.
+7. Run `npm run format`, so the report's tables are formatted. An unformatted report fails `npm run check` for everyone. The baseline of 2026-10-02 was committed unformatted and broke `check` at `HEAD`.
+8. Run `npm run audit:validate`. If it reports problems, fix the **report** (never the code) and rerun until it's valid.
+9. Report back: the counts by risk, each Critical and High finding in one line, and the validation result. **Don't fix anything and don't commit.** Fixing is the PO's decision, through a separate delegation per finding.
 
 ## Output: report format (fixed)
 
