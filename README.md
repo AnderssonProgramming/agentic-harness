@@ -4,7 +4,7 @@ A conversational onboarding assistant for junior developers: it answers question
 
 This repository is also an **AI harness**: the coding agent that builds Compass works under a written contract, and every item it delivers comes with a plan, tests and recorded evidence.
 
-> **Status (Sprint 3, week 5):** Compass talks to a real model, streams replies, and keeps the conversation when you close and reopen the browser. A "New conversation" button clears it after you confirm. If the browser blocks or fills its storage, the chat keeps working and tells you. The persistence feature was built entirely by a delegated agent session from an approved plan ([evidence](docs/evidence/b-08-verification.md)), run under the context-control routine ([CONTEXT-ROUTINE.md](CONTEXT-ROUTINE.md)).
+> **Status (end of Sprint 3):** Compass talks to a real model, keeps the conversation across browser restarts, and manages an onboarding to-do list. Say "remind me to ask Ana how deploys work", "what's on my list?" or "mark the deploy one as done": the app performs it on stored data and shows a confirmation built from what was saved. On an engine without tool calling (Ollama), to-do requests get an honest refusal instead of a made-up confirmation. Both features were built by delegated agents from approved plans and contracts ([B-08](docs/evidence/b-08-verification.md), [B-11 delegation record](docs/evidence/b-11-delegation-record.md)).
 
 ![Compass answering on turn 5 from what it was told on turns 1 and 2](docs/evidence/b-03-live-conversation.png)
 
@@ -32,21 +32,23 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 
 ## Commands
 
-| Command                                    | What it does                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                              | Start the dev server on port 5173                                                                                         |
-| `npm run check`                            | Typecheck + lint + format check + tests. Must pass before any commit                                                      |
-| `npm test`                                 | Run the unit and component tests once (Vitest + Testing Library)                                                          |
-| `npm run verify:chat`                      | Check the chat in headless Chrome on the mock engine: streaming, Stop, offline error, Retry, 5 turns (19 checks) [^1]     |
-| `npm run verify:chat -- --live`            | Five real turns with the engine in `.env`: context and time to first text [^1]                                            |
-| `npm run verify:llm`                       | Check the chat endpoint: stream, history, every error code, a real 401, secrets in the bundle                             |
-| `npm run verify:persistence`               | Check that the conversation survives a real Chrome restart, New conversation, and blocked, full or corrupted storage [^1] |
-| `npm run verify:route -- <path> "<title>"` | Check that a route loads by URL and by nav click in headless Chrome [^1] [^2]                                             |
-| `npm run format`                           | Format all files with Prettier                                                                                            |
-| `npm run lint`                             | ESLint only                                                                                                               |
-| `npm run build`                            | Typecheck and build for production into `dist/`                                                                           |
-| `npm run preview`                          | Serve the production build locally                                                                                        |
-| `npm run engine:check`                     | Verify the configured inference engine answers (needs `.env`, see below)                                                  |
+| Command                                    | What it does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                              | Start the dev server on port 5173                                                                                                             |
+| `npm run check`                            | Typecheck + lint + format check + tests. Must pass before any commit                                                                          |
+| `npm test`                                 | Run the unit and component tests once (Vitest + Testing Library)                                                                              |
+| `npm run verify:chat`                      | Check the chat in headless Chrome on the mock engine: streaming, Stop, offline error, Retry, 5 turns (19 checks) [^1]                         |
+| `npm run verify:chat -- --live`            | Five real turns with the engine in `.env`: context and time to first text [^1]                                                                |
+| `npm run verify:todos`                     | Check the to-do actions in headless Chrome, reading storage directly; `-- --live` for Claude, `-- --live --engine=ollama` for the local model |
+| `npm run verify:persistence`               | Check the conversation survives real browser restarts, blocked or full storage, and corrupted data                                            |
+| `npm run verify:llm`                       | Check the chat endpoint: stream, history, every error code, a real 401, secrets in the bundle                                                 |
+| `npm run verify:persistence`               | Check that the conversation survives a real Chrome restart, New conversation, and blocked, full or corrupted storage [^1]                     |
+| `npm run verify:route -- <path> "<title>"` | Check that a route loads by URL and by nav click in headless Chrome [^1] [^2]                                                                 |
+| `npm run format`                           | Format all files with Prettier                                                                                                                |
+| `npm run lint`                             | ESLint only                                                                                                                                   |
+| `npm run build`                            | Typecheck and build for production into `dist/`                                                                                               |
+| `npm run preview`                          | Serve the production build locally                                                                                                            |
+| `npm run engine:check`                     | Verify the configured inference engine answers (needs `.env`, see below)                                                                      |
 
 [^1]: Uses the installed Google Chrome. If it's not at the default Windows path, set `CHROME_PATH`. Set `APP_URL` to check an already-running server instead of starting one.
 
@@ -54,25 +56,28 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 
 ## How the harness is organized
 
-| File                                                                             | Purpose                                                               |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [`CLAUDE.md`](CLAUDE.md)                                                         | Master context: the agent's role, rules and prohibitions              |
-| [`.claude/settings.json`](.claude/settings.json)                                 | Enforced context exclusions and permissions                           |
-| [`BACKLOG.md`](BACKLOG.md)                                                       | Prioritized product backlog with acceptance criteria                  |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                             | Folder map, architecture decisions (ADR-01 to ADR-09), engine switch  |
-| [`CONTEXT-ROUTINE.md`](CONTEXT-ROUTINE.md)                                       | How to run a long agent session without it losing the thread          |
-| [`CONTEXT-LOG.md`](CONTEXT-LOG.md)                                               | Measured sessions: what filled the context and where quality dropped  |
-| [`TASKS.md`](TASKS.md)                                                           | Repeated tasks measured as Custom Skill candidates, with before/after |
-| [`.claude/skills/`](.claude/skills)                                              | Custom Skills (see below)                                             |
-| [`docs/plans/`](docs/plans)                                                      | Step-by-step plans approved by the Product Owner before any code      |
-| [`docs/evidence/`](docs/evidence)                                                | Verification results, screenshots and contract-test transcripts       |
-| [`docs/contract-tests.md`](docs/contract-tests.md)                               | Deliberate rule violations and how the agent stopped each one         |
-| [`docs/evidence/self-correction-loop.md`](docs/evidence/self-correction-loop.md) | A deliberate compile error and how the agent detected and fixed it    |
-| [`docs/sprint-2-review.md`](docs/sprint-2-review.md)                             | Three-minute demo script for the Sprint 2 Review                      |
-| [`docs/sprint-2-retro.md`](docs/sprint-2-retro.md)                               | Sprint 2 harness retrospective                                        |
-| [`docs/sprint-1-review.md`](docs/sprint-1-review.md)                             | Three-minute demo script for the Sprint Review                        |
-| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)                               | Harness retrospective and the rules it added                          |
-| [`docs/code-walkthrough.md`](docs/code-walkthrough.md)                           | Line-by-line explanation of the chat feature                          |
+| File                                                                             | Purpose                                                                                             |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [`CLAUDE.md`](CLAUDE.md)                                                         | Master context: the agent's role, rules and prohibitions                                            |
+| [`.claude/settings.json`](.claude/settings.json)                                 | Enforced context exclusions and permissions                                                         |
+| [`BACKLOG.md`](BACKLOG.md)                                                       | Prioritized product backlog with acceptance criteria                                                |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                             | Folder map, architecture decisions (ADR-01 to ADR-09), engine switch                                |
+| [`CONTEXT-ROUTINE.md`](CONTEXT-ROUTINE.md)                                       | How to run a long agent session without it losing the thread                                        |
+| [`CONTEXT-LOG.md`](CONTEXT-LOG.md)                                               | Measured sessions: what filled the context and where quality dropped                                |
+| [`TASKS.md`](TASKS.md)                                                           | Repeated tasks measured as Custom Skill candidates, with before/after                               |
+| [`.claude/skills/`](.claude/skills)                                              | Custom Skills (see below)                                                                           |
+| [`docs/plans/`](docs/plans)                                                      | Step-by-step plans approved by the Product Owner before any code                                    |
+| [`docs/evidence/`](docs/evidence)                                                | Verification results, screenshots and contract-test transcripts                                     |
+| [`docs/contract-tests.md`](docs/contract-tests.md)                               | Deliberate rule violations and how the agent stopped each one                                       |
+| [`docs/evidence/self-correction-loop.md`](docs/evidence/self-correction-loop.md) | A deliberate compile error and how the agent detected and fixed it                                  |
+| [`docs/delegations/`](docs/delegations)                                          | Delegation contracts handed to the `feature-builder` subagent ([`.claude/agents/`](.claude/agents)) |
+| [`docs/sprint-3-review.md`](docs/sprint-3-review.md)                             | Three-minute demo script for the Sprint 3 Review                                                    |
+| [`docs/sprint-3-retro.md`](docs/sprint-3-retro.md)                               | Sprint 3 retrospective: where the delegation boundary is                                            |
+| [`docs/sprint-2-review.md`](docs/sprint-2-review.md)                             | Three-minute demo script for the Sprint 2 Review                                                    |
+| [`docs/sprint-2-retro.md`](docs/sprint-2-retro.md)                               | Sprint 2 harness retrospective                                                                      |
+| [`docs/sprint-1-review.md`](docs/sprint-1-review.md)                             | Three-minute demo script for the Sprint Review                                                      |
+| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)                               | Harness retrospective and the rules it added                                                        |
+| [`docs/code-walkthrough.md`](docs/code-walkthrough.md)                           | Line-by-line explanation of the chat feature                                                        |
 
 ## Custom Skills
 
