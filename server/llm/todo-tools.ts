@@ -45,7 +45,7 @@ export function todoContext(todos: readonly TodoRef[]): string {
     todos.length === 0
       ? 'The user has no open to-dos.'
       : `The user's open to-dos (id: text):\n${todos.map((t) => `- ${t.id}: ${t.text}`).join('\n')}`;
-  return `${list}\nUse the to-do tools to add, list or complete to-dos, one tool call per reply. Never answer what is on the list from memory: call list_todos.`;
+  return `${list}\nUse the to-do tools to add, list or complete to-dos, one tool call for each thing the user asks for, in the order they asked. Never answer what is on the list from memory: call list_todos.`;
 }
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');

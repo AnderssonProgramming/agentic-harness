@@ -112,7 +112,8 @@ describe('anthropicEngine', () => {
       'list_todos',
       'complete_todo',
     ]);
-    expect(body.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: true });
+    // Parallel tool use stays on, so several requests in one message all reach the app.
+    expect(body.tool_choice).toBeUndefined();
     expect(body.system).toContain('- t1: ask Ana how deploys work');
   });
 
@@ -146,6 +147,31 @@ describe('anthropicEngine', () => {
     expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
       'Sure.',
       { kind: 'complete', id: 't1', query: 'the deploy one' },
+    ]);
+  });
+
+  it('turns every tool_use of one reply into an action, in order (B-11, Amendment 1)', async () => {
+    const call = (index: number, name: string, json: string) => [
+      { type: 'content_block_start', index, content_block: { type: 'tool_use', name } },
+      {
+        type: 'content_block_delta',
+        index,
+        delta: { type: 'input_json_delta', partial_json: json },
+      },
+      { type: 'content_block_stop', index },
+    ];
+    const fetchImpl = respond(
+      sse(
+        ...call(0, 'add_todo', '{"text": "read the guide"}'),
+        ...call(1, 'complete_todo', '{"description": "the VPN one"}'),
+        ...call(2, 'list_todos', ''),
+        { type: 'message_stop' },
+      ),
+    );
+    expect(await all(anthropicEngine({ ...options, fetchImpl }).stream(input()))).toEqual([
+      { kind: 'add', text: 'read the guide' },
+      { kind: 'complete', id: null, query: 'the VPN one' },
+      { kind: 'list' },
     ]);
   });
 

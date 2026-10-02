@@ -46,9 +46,8 @@ export function anthropicEngine({
             messages,
             max_tokens: maxOutputTokens,
             stream: true,
+            // Parallel tool use stays on: every call becomes an action with its own card (ADR-11).
             tools: TODO_TOOLS,
-            // One action per reply, so each reply has at most one card (ADR-11).
-            tool_choice: { type: 'auto', disable_parallel_tool_use: true },
           }),
           signal,
         });
@@ -62,7 +61,6 @@ export function anthropicEngine({
       let data: string[] = [];
       // A tool call arrives as content_block_start, input_json_delta fragments, content_block_stop.
       const toolCalls = new Map<number, { name: string; json: string }>();
-      let actionSent = false;
       try {
         for await (const line of readLines(response.body, signal)) {
           if (line.startsWith('data:')) {
@@ -94,7 +92,7 @@ export function anthropicEngine({
           } else if (event.type === 'content_block_stop' && toolCalls.has(index)) {
             const call = toolCalls.get(index);
             toolCalls.delete(index);
-            if (call && !actionSent) {
+            if (call) {
               const input = call.json === '' ? {} : parseJsonLine('anthropic', call.json);
               const action = actionFromToolUse(call.name, input);
               if (!action) {
@@ -104,7 +102,6 @@ export function anthropicEngine({
                   'anthropic',
                 );
               }
-              actionSent = true;
               yield action;
             }
           } else if (event.type === 'error' && isRecord(event.error)) {
