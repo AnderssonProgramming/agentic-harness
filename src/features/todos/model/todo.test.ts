@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_TODO_LENGTH } from '../../../shared/llm/limits';
 import {
   addTodo,
   cardSummary,
   cardTitle,
+  checkTodoText,
   completeTodo,
   listOrder,
   matchOpenTodos,
@@ -27,15 +29,26 @@ const list = [deploy, oldDeploy, styleGuide];
 describe('to-do model (B-11)', () => {
   it('adds an open to-do with a new id and trimmed text', () => {
     const source = { newId: () => 'new', now: () => 5 };
-    const { todos, added } = addTodo([deploy], '  set up the VPN ', source);
-    expect(added).toEqual({
+    const result = addTodo([deploy], '  set up the VPN ', source);
+    const added = {
       id: 'new',
       text: 'set up the VPN',
       done: false,
       createdAt: 5,
       doneAt: null,
-    });
-    expect(todos).toEqual([deploy, added]);
+    };
+    expect(result).toEqual({ ok: true, added, todos: [deploy, added] });
+  });
+
+  it('accepts a to-do of exactly 200 characters and refuses 201, after trimming (F-02)', () => {
+    const source = { newId: () => 'new', now: () => 5 };
+    const exact = 'a'.repeat(MAX_TODO_LENGTH);
+    expect(checkTodoText(`  ${exact}  `)).toEqual({ valid: true, text: exact });
+    expect(checkTodoText(`${exact}b`)).toEqual({ valid: false, reason: 'too-long' });
+    expect(addTodo([deploy], `${exact}b`, source)).toEqual({ ok: false, reason: 'too-long' });
+    expect(cardTitle({ kind: 'failed', action: 'add', reason: 'too-long' })).toBe(
+      "Couldn't save to your list: the to-do is too long (more than 200 characters). Nothing was changed.",
+    );
   });
 
   it('completes only the to-do with that id', () => {

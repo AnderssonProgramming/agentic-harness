@@ -16,7 +16,7 @@ export interface TodoView {
   done: boolean;
 }
 
-export type TodoFailure = 'unavailable' | 'full' | 'not-saved';
+export type TodoFailure = 'unavailable' | 'full' | 'not-saved' | 'too-long';
 
 /** The app's confirmation of an action, built only from stored data (ADR-11). */
 export type TodoCard =
@@ -63,19 +63,31 @@ export function openRefs(todos: readonly Todo[]): TodoRef[] {
     }));
 }
 
+export type TodoTextCheck = { valid: true; text: string } | { valid: false; reason: 'too-long' };
+
+/** The one check of a to-do's text (F-02); the server applies the same limit to refs (F-04). */
+export function checkTodoText(text: string): TodoTextCheck {
+  const trimmed = text.trim();
+  return trimmed.length > MAX_TODO_LENGTH
+    ? { valid: false, reason: 'too-long' }
+    : { valid: true, text: trimmed };
+}
+
 export function addTodo(
   todos: readonly Todo[],
   text: string,
   source: TodoSource,
-): { todos: Todo[]; added: Todo } {
+): { ok: true; todos: Todo[]; added: Todo } | { ok: false; reason: 'too-long' } {
+  const check = checkTodoText(text);
+  if (!check.valid) return { ok: false, reason: check.reason };
   const added: Todo = {
     id: source.newId(),
-    text: text.trim(),
+    text: check.text,
     done: false,
     createdAt: source.now(),
     doneAt: null,
   };
-  return { todos: [...todos, added], added };
+  return { ok: true, todos: [...todos, added], added };
 }
 
 export function completeTodo(todos: readonly Todo[], id: string, now: number): Todo[] {
@@ -141,6 +153,7 @@ const FAILURE_TEXT: Record<TodoFailure, string> = {
   unavailable: 'your browser is blocking storage',
   full: "your browser's storage is full",
   'not-saved': "the change didn't reach storage",
+  'too-long': `the to-do is too long (more than ${String(MAX_TODO_LENGTH)} characters)`,
 };
 
 const quoted = (query: string) => (query === '' ? 'that' : `“${query}”`);

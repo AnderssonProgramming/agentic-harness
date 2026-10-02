@@ -51,6 +51,17 @@ describe('TodoActionCard (B-11)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save to your list");
   });
 
+  it('shows an over-long to-do as a failure that says it is too long (F-02)', () => {
+    render(
+      <TodoActionCard
+        state={{ status: 'settled', card: { kind: 'failed', action: 'add', reason: 'too-long' } }}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't save to your list: the to-do is too long (more than 200 characters). Nothing was changed.",
+    );
+  });
+
   it('says a refused request was not done, and why (Amendment 1)', () => {
     render(
       <TodoActionCard

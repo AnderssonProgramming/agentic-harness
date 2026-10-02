@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_TODO_LENGTH, MAX_TODOS_SENT } from '../../../shared/llm/limits';
+import { cardTitle } from '../model/todo';
 import { fakeStorage } from './fake-storage';
 import { createTodoActions } from './todo-actions';
 import { TODO_STORAGE_KEY, createTodoStore } from './todo-store';
@@ -77,6 +78,22 @@ describe('to-do actions (B-11)', () => {
     expect(ambiguous).toMatchObject({ kind: 'ambiguous', query: 'the deploy one' });
     expect(ambiguous.kind === 'ambiguous' && ambiguous.candidates.length).toBe(2);
     expect(storage.getItem(TODO_STORAGE_KEY)).toBe(before);
+  });
+
+  it('stores nothing for a to-do over 200 characters and says it is too long (F-02)', () => {
+    const { actions, storage, stored } = setup();
+    actions.execute({ kind: 'add', text: 'read the style guide' });
+    const before = storage.getItem(TODO_STORAGE_KEY);
+
+    const card = actions.execute({ kind: 'add', text: 'x'.repeat(MAX_TODO_LENGTH + 1) });
+    expect(card).toEqual({ kind: 'failed', action: 'add', reason: 'too-long' });
+    expect(cardTitle(card)).toContain('too long');
+    expect(storage.getItem(TODO_STORAGE_KEY)).toBe(before);
+    expect(stored()).toEqual([expect.objectContaining({ text: 'read the style guide' })]);
+
+    const exact = actions.execute({ kind: 'add', text: 'y'.repeat(MAX_TODO_LENGTH) });
+    expect(exact.kind).toBe('added');
+    expect(stored()).toHaveLength(2);
   });
 
   it('reports a full storage as a failure and stores nothing', () => {

@@ -81,7 +81,7 @@ describe('restoreSnapshot', () => {
       }),
     ],
     ['an unknown older version', '{"version":0,"items":[]}'],
-    ['a future version', '{"version":4,"messages":[]}'],
+    ['a future version', '{"version":5,"messages":[]}'],
     [
       'a to-do card that is not valid',
       JSON.stringify({
@@ -140,6 +140,27 @@ describe('restoreSnapshot', () => {
     expect(restoreSnapshot(raw)).toEqual({ messages: withCard, outcome: 'restored' });
   });
 
+  it('migrates version 3 to 4 unchanged, and round-trips a too-long failure card (F-02)', () => {
+    const withCard = [
+      message({ id: 'id-1', text: 'Remind me to ask Ana how deploys work' }),
+      message({ id: 'id-2', author: 'assistant', text: '', actions: [card] }),
+    ];
+    const v3 = JSON.stringify({ version: 3, messages: withCard });
+    expect(restoreSnapshot(v3)).toEqual({ messages: withCard, outcome: 'restored' });
+
+    const tooLong = {
+      status: 'settled' as const,
+      card: { kind: 'failed' as const, action: 'add' as const, reason: 'too-long' as const },
+    };
+    const withFailure = [
+      message({ id: 'id-3', author: 'assistant', text: '', actions: [tooLong] }),
+    ];
+    expect(restoreSnapshot(toSnapshot(withFailure))).toEqual({
+      messages: withFailure,
+      outcome: 'restored',
+    });
+  });
+
   it('round-trips several settled cards and drops pending ones after a restart (B-11)', () => {
     const refused = {
       status: 'settled' as const,
@@ -161,7 +182,7 @@ describe('restoreSnapshot', () => {
       }),
     ]);
     const { messages } = restoreSnapshot(raw);
-    expect(JSON.parse(raw)).toMatchObject({ version: 3 });
+    expect(JSON.parse(raw)).toMatchObject({ version: 4 });
     expect(messages[1]?.actions).toEqual([card, refused]);
     expect(messages[3]).toMatchObject({ status: 'stopped', actions: [] });
   });

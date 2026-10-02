@@ -34,7 +34,7 @@ function isTodoView(value: unknown): value is TodoView {
 
 const isViewList = (value: unknown) => Array.isArray(value) && value.every(isTodoView);
 const ACTION_KINDS: readonly unknown[] = ['add', 'list', 'complete'];
-const FAILURES: readonly unknown[] = ['unavailable', 'full', 'not-saved'];
+const FAILURES: readonly unknown[] = ['unavailable', 'full', 'not-saved', 'too-long'];
 
 export function isTodoCard(value: unknown): value is TodoCard {
   if (!isRecord(value)) return false;

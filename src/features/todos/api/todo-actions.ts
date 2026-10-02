@@ -71,8 +71,9 @@ export function createTodoActions(
         case 'list':
           return { kind: 'listed', todos: listOrder(todos) };
         case 'add': {
-          const { todos: next, added } = addTodo(todos, action.text, source);
-          return commit('add', next, added.id, 'added');
+          const result = addTodo(todos, action.text, source);
+          if (!result.ok) return { kind: 'failed', action: 'add', reason: result.reason };
+          return commit('add', result.todos, result.added.id, 'added');
         }
         case 'complete': {
           const matches = matchOpenTodos(todos, action);

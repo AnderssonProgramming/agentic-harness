@@ -4,9 +4,10 @@ import type { Message } from './message';
 
 /**
  * Version 2 (B-11) added `action` to every message. Version 3 (B-11, Amendment 1) made it
- * `actions`, a list, and added the `unsupported` card.
+ * `actions`, a list, and added the `unsupported` card. Version 4 (audit F-02) added the
+ * `too-long` reason to failed cards.
  */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
 /** Migration `n` turns version-`n` data into version `n + 1`. */
 export type Migrations = Readonly<Record<number, (data: Record<string, unknown>) => unknown>>;
@@ -35,6 +36,8 @@ export const CONVERSATION_MIGRATIONS: Migrations = {
       ...message,
       actions: action === null || action === undefined ? [] : [action],
     })),
+  // Version 3 is a subset of version 4 (one more failure reason), so only the version changes.
+  3: (data) => ({ ...data, version: 4 }),
 };
 
 export type RestoreOutcome = 'restored' | 'empty' | 'reset';
