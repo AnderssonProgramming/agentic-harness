@@ -8,19 +8,20 @@ The agent must read it before proposing any plan, and must add an ADR in the sam
 
 Read this table first. Then open only the ADRs your task touches, e.g. `Grep "ADR-07" -A 12 ARCHITECTURE.md`. Don't read the whole file (CONTEXT-ROUTINE.md, step 3).
 
-| ADR                                                                                                          | Decision                                                                                 | Status                                       | Touches                  |
-| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
-| [ADR-01](#adr-01-folder-structure-by-feature-not-by-type)                                                    | Folders by feature (`src/features/<f>/`), roles inside                                   | Active                                       | Any new code             |
-| [ADR-02](#adr-02-vite--react-spa-instead-of-nextjs)                                                          | Vite + React SPA, not Next.js                                                            | Active (revisited by ADR-08)                 | Build, framework         |
-| [ADR-03](#adr-03-inference-behind-one-interface-selected-by-an-environment-variable-keys-only-on-the-server) | One engine interface; `INFERENCE_ENGINE` picks it; keys only on the server               | Active                                       | Model, secrets           |
-| [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                        | Conversation state in `useChat` with `useState`; pure transitions; no state library      | Active                                       | Chat state, persistence  |
-| [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                   | Fixed placeholder reply                                                                  | **Superseded** by B-03                       | —                        |
-| [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                           | Route table + History API hook; no router library                                        | Active                                       | Screens, navigation      |
-| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                         | Features reach the outside only through `api/`                                           | Active (refined by ADR-10)                   | Network, storage access  |
-| [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                         | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/` | Active                                       | Server, endpoint         |
-| [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                | One NDJSON event stream; 13 error codes; mock engine                                     | Active                                       | Streaming, errors, tests |
-| [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                               | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard               | Active                                       | Persistence, storage     |
-| [ADR-11](#adr-11-the-model-requests-to-do-actions-the-browser-runs-them-and-confirms)                        | The model requests to-do actions (`action` event); the browser runs them and confirms    | **Proposed by the agent, pending PO review** | To-dos, protocol, tools  |
+| ADR                                                                                                                | Decision                                                                                                          | Status                                                                          | Touches                     |
+| ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------- |
+| [ADR-01](#adr-01-folder-structure-by-feature-not-by-type)                                                          | Folders by feature (`src/features/<f>/`), roles inside                                                            | Active                                                                          | Any new code                |
+| [ADR-02](#adr-02-vite--react-spa-instead-of-nextjs)                                                                | Vite + React SPA, not Next.js                                                                                     | Active (revisited by ADR-08)                                                    | Build, framework            |
+| [ADR-03](#adr-03-inference-behind-one-interface-selected-by-an-environment-variable-keys-only-on-the-server)       | One engine interface; `INFERENCE_ENGINE` picks it; keys only on the server                                        | Active                                                                          | Model, secrets              |
+| [ADR-04](#adr-04-conversation-state-in-a-feature-hook-with-usestate-no-state-library)                              | Conversation state in `useChat` with `useState`; pure transitions; no state library                               | Active                                                                          | Chat state, persistence     |
+| [ADR-05](#adr-05-fixed-local-assistant-reply-until-the-model-is-connected)                                         | Fixed placeholder reply                                                                                           | **Superseded** by B-03                                                          | —                           |
+| [ADR-06](#adr-06-a-route-table-and-a-history-api-hook-instead-of-a-router-library)                                 | Route table + History API hook; no router library                                                                 | Active                                                                          | Screens, navigation         |
+| [ADR-07](#adr-07-each-feature-talks-to-the-outside-world-through-its-own-api-folder)                               | Features reach the outside only through `api/`                                                                    | Active (refined by ADR-10)                                                      | Network, storage access     |
+| [ADR-08](#adr-08-the-chat-endpoint-runs-inside-vites-own-server-mounted-by-a-plugin)                               | Chat endpoint mounted in Vite's dev/preview server; `.ts` import extensions in `server/`                          | Active                                                                          | Server, endpoint            |
+| [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                      | One NDJSON event stream; 13 error codes; mock engine                                                              | Active (extended by ADR-11: `action` event, `start.actions`, `GET /api/engine`) | Streaming, errors, tests    |
+| [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                                     | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard                                        | Active (snapshot now at version 3: migrations 1→2→3)                            | Persistence, storage        |
+| [ADR-11](#adr-11-the-model-requests-to-do-actions-the-browser-runs-them-and-confirms)                              | The model requests to-do actions (`action` event); the browser runs them and confirms                             | Accepted with corrections                                                       | To-dos, protocol, tools     |
+| [ADR-12](#adr-12-b-06s-knowledge-base-goes-whole-into-the-system-prompt-within-a-total-budget-and-a-secrets-guard) | B-06: knowledge files go whole into the system prompt, with a total budget per engine and a secrets guard; no RAG | Accepted with corrections; not built                                            | Knowledge base, prompt size |
 
 New ADRs add a row here in the same commit.
 
@@ -170,7 +171,7 @@ Rejected alternatives:
 
 ## [ADR-11] The model requests to-do actions, the browser runs them and confirms
 
-Date: 2026-10-01. Status: **Proposed by the agent, pending PO review** (B-11 delegation contract, Decisions 1–5).
+Date: 2026-10-01. Status: **Accepted with corrections by the PO on 2026-10-01** (see "PO review" at the end of this ADR). Proposed by the `feature-builder` subagent (B-11 delegation contract, Decisions 1–5, Amendment 1).
 
 Decision:
 
@@ -194,6 +195,57 @@ Amendment 1 (2026-10-01, B-11 contract Amendment 1, still **Proposed**). A syste
 - **Standing notice.** While the engine can't run actions, the chat shows that Compass can't change the to-do list with it and that saved to-dos are safe. It goes away when an engine with actions answers.
 - **Unreadable to-do data** is still removed, and the chat says so once, like an unreadable conversation (B-08).
 - **Several actions per reply.** Anthropic allows parallel tool use; every `tool_use`, and every to-do sentence for the mock, becomes an action event in order. The browser runs them in that order after `done`, each with its own card. The conversation snapshot moves to version 3: `action` becomes `actions` (a list), with a migration from version 2.
+
+**PO review (2026-10-01): accepted with corrections.**
+
+- **Agent's proposal:** the model requests to-do actions through tool calling; the browser runs them on its own stored list, reads the list back, and builds the confirmation card from what's stored (plus Amendment 1: engines declare whether they can run actions, to-do phrases never reach an engine without them, a standing notice, several actions per reply).
+- **Decision:** accepted, with these corrections.
+  1. **The pass-1 claim was false as written.** "Makes a false confirmation structurally impossible, whatever the engine says" didn't hold: on `phi3`, the model's own text said "I've set a reminder" with nothing stored. Only the **cards** are structurally honest. The model's text on engines without tool calling is kept honest by Amendment 1's capability-based refusal, not by the prompt. This ADR is accepted only together with Amendment 1.
+  2. **The protocol changed twice, not once.** The `start` event gained `actions`, and `GET /api/engine` is new, beyond the one `action` event the contract allowed. The agent flagged this itself. Accepted, and recorded in ADR-09.
+  3. **Refusing "what's on my list?" on an engine without tools contradicts this ADR's own principle** (data, not model). The app can read the list from storage on any engine. My amendment said "not performed", and the agent took it literally, so the error is in my contract. Fixed later in backlog item **B-12**, not by reopening this delegation.
+  4. **The 20 s idle timeout is too short for a local model loading cold on CPU.** The first Ollama reply timed out twice this week. Tracked as **B-13**.
+- **Reason:** the design solves the real problem (the user can trust what Compass says about the list), it fits ADR-01, ADR-07 and ADR-10 (browser-side store, versioned snapshot, never throws), and its pieces are small, tested, pure functions I can maintain and audit in Sprint 4.
+- **Rejected alternatives:**
+  - the agent's pass-1 choices "only the first action counts" and "unreadable to-do data is reset with no notice", both overruled in Amendment 1;
+  - executing on the server, which the agent also rejected.
+
+## [ADR-12] B-06's knowledge base goes whole into the system prompt, within a total budget and a secrets guard
+
+Date: 2026-10-01. Status: **Accepted with corrections by the PO, not yet built** (B-06 is pending).
+
+**Agent's proposal** (a read-only session asked for an architecture for B-06; the transcript is in `docs/evidence/adr-12-proposal.md`):
+
+- On every request, the server reads `knowledge/*.md` and appends each file to the system prompt as a `<document source="…">` block, with no retrieval.
+- Files over 50 KB are skipped with a warning.
+- It's injected into the handler like `env`; no new dependencies; no protocol change.
+
+**Decision: accepted with corrections.**
+
+The approach stays. Two risks the proposal left open become requirements:
+
+1. **A total budget, not only a per-file limit.** Ten files of 50 KB is about 125k tokens, and Ollama's small default context **silently truncates** a long prompt. That would cut off the system prompt and quietly break B-04 ("switching engines needs no code change").
+   - **Total budget per engine:** about 40,000 characters for Anthropic, and about 8,000 for Ollama unless the request sets `num_ctx` large enough.
+   - **Fixed order:** files load in alphabetical order. Whatever doesn't fit is skipped, with a warning that lists the files left out.
+2. **A secrets guard.** Everything in `knowledge/` goes to the provider, so one pasted key in a convention doc would break ADR-03 ("keys only on the server") by design. Any file that matches a key pattern (`sk-ant-`, `-----BEGIN … PRIVATE KEY`, `api_key=`-style assignments) is **skipped, never sent**, and named in the warning.
+
+Answers to the proposal's questions:
+
+- **The warning goes to the server console** (B-06's "console"). Showing it in the browser would need a new event.
+- **Over budget, files are skipped with a warning.** The request never fails.
+- **Criterion 2 needs both kinds of evidence:** a deterministic test that the content reaches `system`, plus a recorded live check against a fixture `knowledge/`.
+
+**Reason:**
+
+- It solves the real problem: answers from the team's own documents, for a 15-person team.
+- It fits ADR-03, ADR-08 and ADR-09.
+- Plain file reading plus two guards is easy to maintain and audit.
+
+The corrections protect two promises the product already made: engine switching (B-04) and keys staying on the server (ADR-03).
+
+**Rejected alternatives:**
+
+- **RAG with embeddings and a vector store.** The agent rejected it too: new dependencies, non-determinism and per-chunk citations (B-07), for a scale problem we don't have.
+- **The proposal as submitted, with only a per-file limit.** Rejected, because its main risk was left as a "risk to measure" instead of a requirement.
 
 ## Inference engine
 
