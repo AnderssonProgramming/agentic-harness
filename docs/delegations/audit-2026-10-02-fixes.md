@@ -75,3 +75,27 @@ Written by the `feature-builder` subagent. One commit per finding, in triage ord
 | 4    | F-03    | `server/llm/engine.ts` passes `maxOutputTokens` to Ollama; `engines/ollama.ts` sends `options.num_predict`; engine test                                                                 | F-03: request body carries the cap                                          |
 | 5    | F-05    | `engines/types.ts` (usage chunk), `anthropic.ts`, `ollama.ts`, `mock.ts` report usage; `handler.ts` logs one line on `done`; engine and handler tests                                   | F-05: one usage line per completed reply, provider numbers, no message text |
 | 6    | all     | `npm run -s check`, `verify:llm`, `verify:todos`, `verify:persistence`, `verify:chat` (temp screenshot folder), `audit:validate`                                                        | No regression                                                               |
+
+## Amendment 1 (after the second audit run, approved by the PO on 2026-10-02)
+
+### Why
+
+The second audit run (`docs/audit/2026-10-02-eeee42b.md`) found that two fixes can be bypassed. The PO confirmed both in the code:
+
+- **IN-02:** the 4,000-character cap is checked per message, but `trimHistory` then merges consecutive user turns and always keeps the newest merged turn. So 60 back-to-back user messages of 4,000 characters reach the model as one turn of about 240,000 characters.
+- **LLM-05:** count and text are bounded, but a to-do's `id` isn't, and it goes into the system prompt too.
+
+**The original contract was wrong, not the implementation.** It specified limits on individual _elements_. What the PO needs is an **invariant about what reaches the model**, whatever shape the request takes.
+
+### Acceptance criteria (invariants, with evidence)
+
+- [ ] **IN-02 invariant:** for any accepted request, the total characters of the messages passed to the engine are at most `LLM_CONFIG.historyChars`, **including the newest turn after merging**. A request whose newest merged user turn alone exceeds the budget gets `bad_request`, and the model isn't called. A normal case must keep working: up to a few unanswered messages of 4,000 characters each, merged, within the budget.
+- [ ] **LLM-05 invariant:** for any accepted request, everything the server **adds** to the prompt (the system prompt, the to-do context and the tool instructions) is at most a fixed, named bound, and the to-do `id` is bounded too. Pick the id limit to fit the app's real ids, e.g. UUIDs of 36 characters, and say what you chose. Anything over it gets `bad_request`, and the model isn't called.
+- [ ] **Evidence:**
+  - handler tests that reproduce **exactly** the two bypasses above (and fail on the current code before your fix);
+  - **a property-style test that generates many request shapes** (counts, lengths, consecutive roles, ids) and asserts both invariants on what the engine receives, using a recording engine. Make it deterministic: a fixed seed or a fixed table, no randomness between runs.
+- [ ] **No regression:** `npm run -s check`, and every `verify:*` with screenshots in a temp folder.
+
+### Limits
+
+The same as the original contract. One commit per bypass, naming the finding and the criterion, e.g. `fix(llm): bound the merged newest turn (F-01 bypass, IN-02)`. **Don't run the audit skill.**
