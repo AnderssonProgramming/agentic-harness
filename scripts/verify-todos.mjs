@@ -105,12 +105,28 @@ const SEEDED_TODOS = JSON.stringify({
   ],
 });
 
+// Amendment 2: holds back the page's GET /api/engine response, so the app renders (composer
+// ready) well before it knows the engine. Forces the ordering that made the notice check flaky.
+const ENGINE_INFO_DELAY_MS = 1_500;
+const delayEngineInfo = (ms) => `(() => {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const response = realFetch(input, init);
+    if (new URL(url, location.href).pathname !== '/api/engine') return response;
+    return response.then((r) => new Promise((resolve) => setTimeout(() => resolve(r), ${String(ms)})));
+  };
+})()`;
+
 /**
  * Amendment 1 (a): with an engine that can't run actions, the standing notice shows, to-do
  * phrases get the app's refusal with storage byte-identical, and other wording reaches the model.
  */
-async function engineWithoutActions(label, replyTimeoutMs) {
-  await open({ keepProfile: false });
+async function engineWithoutActions(label, replyTimeoutMs, { engineInfoDelayMs = 0 } = {}) {
+  await open({
+    keepProfile: false,
+    script: engineInfoDelayMs > 0 ? delayEngineInfo(engineInfoDelayMs) : undefined,
+  });
   await page.waitFor(
     "document.querySelector('[data-notice=\"engine\"]')?.classList.contains('todo-notice')",
   );
@@ -479,7 +495,11 @@ try {
 
       // Amendment 1 (a): an engine without tool calling (MOCK_TOOLS=off).
       await restartApp({ MOCK_TOOLS: 'off' });
-      await engineWithoutActions('Mock with MOCK_TOOLS=off');
+      await engineWithoutActions(
+        `Mock with MOCK_TOOLS=off, engine info delayed ${String(ENGINE_INFO_DELAY_MS)} ms`,
+        undefined,
+        { engineInfoDelayMs: ENGINE_INFO_DELAY_MS },
+      );
       await restartApp({ MOCK_TOOLS: undefined });
       await open({ keepProfile: false });
       await page.waitFor('!!document.querySelector(\'[data-notice="engine"]\')');
