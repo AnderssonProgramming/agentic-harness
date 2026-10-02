@@ -434,7 +434,7 @@ try {
         todosAfter !== null &&
           todosAfter === todosAtClose &&
           JSON.stringify(cardsAfter) === JSON.stringify(cardsAtClose) &&
-          conversation.version === 3 &&
+          conversation.version === 4 &&
           storedCards === cardsAfter.length,
         `${String(JSON.parse(todosAfter ?? '{"todos":[]}').todos.length)} to-dos; ${String(cardsAfter.length)} cards on screen, ${String(storedCards)} in the stored conversation (version ${String(conversation.version)})`,
       );
