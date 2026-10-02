@@ -9,6 +9,7 @@ import {
   MAX_TODOS_SENT,
 } from '../../src/shared/llm/limits.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
+import { LLM_CONFIG } from './config.ts';
 import type { Env } from './engine.ts';
 import { anthropicEngine } from './engines/anthropic.ts';
 import { ollamaEngine } from './engines/ollama.ts';
@@ -199,6 +200,42 @@ describe('chat handler', () => {
     });
     expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'bad_request' } });
     expect(engine.calls).toHaveLength(0);
+  });
+
+  it('rejects 60 back-to-back 4,000-character user messages that merge past the budget (F-01 bypass, IN-02)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const messages = Array.from({ length: 60 }, () => ({
+      role: 'user',
+      content: 'a'.repeat(MAX_MESSAGE_LENGTH),
+    }));
+
+    expect((await post(url, { messages })).at(-1)).toMatchObject({
+      type: 'error',
+      error: { code: 'bad_request' },
+    });
+    expect(engine.calls).toHaveLength(0);
+  });
+
+  it('still sends a few unanswered 4,000-character messages, merged, within the budget (IN-02)', async () => {
+    const engine = spyEngine();
+    const url = await start({ env: () => mockEnv, engineFor: () => engine });
+    const messages = [
+      { role: 'user', content: 'earlier' },
+      { role: 'assistant', content: 'reply' },
+      ...Array.from({ length: 5 }, () => ({
+        role: 'user',
+        content: 'a'.repeat(MAX_MESSAGE_LENGTH),
+      })),
+    ];
+
+    expect((await post(url, { messages })).at(-1)).toEqual({ type: 'done' });
+    const sent = engine.calls[0]?.messages ?? [];
+    expect(sent.at(-1)?.content).toHaveLength(5 * MAX_MESSAGE_LENGTH + 4 * 2);
+    expect(sent.reduce((total, turn) => total + turn.content.length, 0)).toBeLessThanOrEqual(
+      LLM_CONFIG.historyChars,
+    );
   });
 
   it('accepts 50 to-do refs and rejects 51 without calling the engine (F-04)', async () => {

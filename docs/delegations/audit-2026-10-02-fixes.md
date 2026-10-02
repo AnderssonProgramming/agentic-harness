@@ -99,3 +99,14 @@ The second audit run (`docs/audit/2026-10-02-eeee42b.md`) found that two fixes c
 ### Limits
 
 The same as the original contract. One commit per bypass, naming the finding and the criterion, e.g. `fix(llm): bound the merged newest turn (F-01 bypass, IN-02)`. **Don't run the audit skill.**
+
+### Plan (Amendment 1)
+
+Written by the `feature-builder` subagent. Tests are written first and run against the current code to confirm they fail.
+
+| Step | Bypass        | Files                                                                                                                                                                                                                                                 | Criterion covered                     |
+| ---- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1    | F-01 (IN-02)  | `server/llm/history.ts` `trimHistory` throws `bad_request` when the newest merged turn alone exceeds the budget; `history.test.ts`; `handler.test.ts` (60 × 4,000 back-to-back → rejected; 5 × 4,000 → accepted and within budget)                    | IN-02 invariant, bypass reproduction  |
+| 2    | F-04 (LLM-05) | `src/shared/llm/limits.ts` `MAX_TODO_ID_LENGTH` (36, a UUID); `history.ts` `parseTodoRefs` rejects longer ids; `todo-tools.ts` named bound on what the server adds + `systemWithTodos`; `anthropic.ts` uses it; `handler.ts` guard; tests             | LLM-05 invariant, bypass reproduction |
+| 3    | both          | `server/llm/prompt-invariants.test.ts`: fixed-table property test over counts, lengths, consecutive roles and ids with a recording engine, asserting both invariants on what the engine receives (or that the engine isn't called when `bad_request`) | Property-style evidence               |
+| 4    | all           | `npm run -s check`, every `verify:*` with screenshots in a temp folder                                                                                                                                                                                | No regression                         |

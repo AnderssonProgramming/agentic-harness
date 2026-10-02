@@ -58,6 +58,8 @@ export function parseChatRequest(body: unknown): ChatTurn[] {
  * What is sent to the model on each call: the whole conversation while it fits the budget,
  * otherwise the newest turns. The result starts and ends with a user turn and never has two
  * turns in a row from the same role (they are merged), which every provider accepts.
+ * The total never exceeds `maxChars`: a newest merged turn that alone exceeds it throws
+ * "bad_request" (back-to-back user messages would otherwise bypass the per-message cap, IN-02).
  */
 export function trimHistory(messages: readonly ChatTurn[], maxChars: number): ChatTurn[] {
   const merged: ChatTurn[] = [];
@@ -74,11 +76,18 @@ export function trimHistory(messages: readonly ChatTurn[], maxChars: number): Ch
     }
   }
 
+  const newest = merged.at(-1);
+  if (newest !== undefined && newest.content.length > maxChars) {
+    throw chatError(
+      'bad_request',
+      `The newest message, merged with the unanswered ones before it, is longer than ${String(maxChars)} characters`,
+    );
+  }
+
   const kept: ChatTurn[] = [];
   let used = 0;
   for (const turn of [...merged].reverse()) {
-    // The newest turn is always kept, even if it alone exceeds the budget.
-    if (kept.length > 0 && used + turn.content.length > maxChars) break;
+    if (used + turn.content.length > maxChars) break;
     kept.unshift(turn);
     used += turn.content.length;
   }
