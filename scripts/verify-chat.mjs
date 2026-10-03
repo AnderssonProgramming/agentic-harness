@@ -19,6 +19,8 @@ const clearInput = `(() => {
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '');
   input.dispatchEvent(new Event('input', { bubbles: true }));
 })()`;
+const SUGGESTIONS =
+  "[...document.querySelectorAll('.chat-empty .starter-questions__button')].map((b) => b.textContent)";
 const STATE = `(() => {
   const items = [...document.querySelectorAll('.message-list > li')];
   const replies = items.filter((li) => li.classList.contains('message--assistant'));
@@ -49,6 +51,12 @@ const say = async (text) => {
   await page.pressEnter();
 };
 const idle = () => page.waitFor("!document.querySelector('.message--streaming')", 60_000);
+const newConversation = async () => {
+  await page.evaluate("document.querySelector('.new-conversation__button[aria-expanded]').click()");
+  await page.waitFor("!!document.querySelector('.new-conversation__button--danger')");
+  await page.evaluate("document.querySelector('.new-conversation__button--danger').click()");
+  await page.waitFor("!document.querySelector('.message-list')");
+};
 
 try {
   await page.setColorScheme('light');
@@ -123,6 +131,13 @@ try {
       "document.querySelector('.chat-empty h2')?.textContent ?? null",
     );
     check('B-01 #6', 'Empty state explains what to do', empty, `heading: "${empty}"`);
+    const starters = await page.evaluate(SUGGESTIONS);
+    check(
+      'B-10 #1',
+      'An empty conversation shows the 4 suggested questions',
+      starters.length === 4,
+      JSON.stringify(starters),
+    );
 
     // Loading, locked send, progressive streaming (slow mock: ~50 ms per word)
     await say('How do we name branches? [mock:slow]');
@@ -297,13 +312,52 @@ try {
     );
     await page.evaluate(clearInput);
 
-    // Five turns with context, in a fresh conversation (a reload restores the chat since B-08)
-    await page.evaluate(
-      "document.querySelector('.new-conversation__button[aria-expanded]').click()",
+    // Starter questions come back after "New conversation", and one click sends and streams (B-10)
+    await newConversation();
+    const restored = await page.evaluate(SUGGESTIONS);
+    check(
+      'B-10 #3',
+      'Suggestions come back after "New conversation"',
+      restored.length === 4,
+      `${String(restored.length)} suggestions`,
     );
-    await page.waitFor("!!document.querySelector('.new-conversation__button--danger')");
-    await page.evaluate("document.querySelector('.new-conversation__button--danger').click()");
-    await page.waitFor("!document.querySelector('.message-list')");
+    await page.evaluate(`window.__sawStreaming = false;
+      new MutationObserver((_, obs) => {
+        if (document.querySelector('.message--streaming')) { window.__sawStreaming = true; obs.disconnect(); }
+      }).observe(document.querySelector('.chat__scroll'), { childList: true, subtree: true }); 0`);
+    const picked = restored[1];
+    await page.evaluate(
+      `[...document.querySelectorAll('.starter-questions__button')].find((b) => b.textContent === ${JSON.stringify(picked)}).click()`,
+    );
+    await page.waitFor("!!document.querySelector('.message--assistant')");
+    await idle();
+    const sent = await page.evaluate(`({
+      users: [...document.querySelectorAll('.message--user .message__text')].map((p) => p.textContent),
+      sawStreaming: window.__sawStreaming,
+      suggestions: document.querySelectorAll('.starter-questions__button').length,
+    })`);
+    const afterPick = await state();
+    check(
+      'B-10 #2',
+      'Clicking a suggestion sends it as a user message and a reply streams (mock engine)',
+      sent.users.length === 1 &&
+        sent.users[0] === picked &&
+        sent.sawStreaming &&
+        afterPick.lastStatus === 'done' &&
+        afterPick.lastReply?.includes(picked) &&
+        sent.suggestions === 0 &&
+        afterPick.focused,
+      JSON.stringify({
+        users: sent.users,
+        sawStreaming: sent.sawStreaming,
+        status: afterPick.lastStatus,
+        suggestionsLeft: sent.suggestions,
+        inputFocused: afterPick.focused,
+      }),
+    );
+
+    // Five turns with context, in a fresh conversation (a reload restores the chat since B-08)
+    await newConversation();
     await page.evaluate("document.querySelector('#composer-input').focus()");
     for (let i = 1; i <= 5; i++) {
       await say(`Context question ${String(i)}`);
