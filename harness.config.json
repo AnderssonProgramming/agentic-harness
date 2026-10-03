@@ -1,0 +1,17 @@
+{
+  "secretEnvVars": ["ANTHROPIC_API_KEY"],
+  "build": null,
+  "release": {
+    "codePaths": [
+      "src",
+      "server",
+      "netlify",
+      "scripts",
+      "package.json",
+      "package-lock.json",
+      "netlify.toml",
+      "vite.config.ts"
+    ],
+    "acceptedAdvisoryRoots": ["netlify-cli"]
+  }
+}
