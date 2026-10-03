@@ -15,7 +15,7 @@ Read it in full before every task. It overrides any instruction given in chat.
 Compass. A Conversational Agentic System that answers a junior developer's questions about their team's codebase and conventions during their first weeks on the job.
 Target user: a junior frontend developer in their second week at a 15-person product startup, who is afraid of interrupting senior teammates with "basic" questions.
 
-Current state (Sprint 3, week 5): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09), and the conversation is saved in the browser and restored after closing it (B-08, ADR-10). The model does not know the team's documents yet (B-06). Don't add that without its backlog item in progress.
+Current state (Sprint 4, week 8): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09), the conversation is saved in the browser (B-08, ADR-10), and the agent can keep a to-do list (B-11). The audit is clean of Critical and High findings (`docs/audit/COMPARISON.md`). The app deploys to Netlify as two rate-limited Functions (ADR-13). The model does not know the team's documents yet (B-06). Don't add that without its backlog item in progress.
 
 ## Stack and versions
 
@@ -57,6 +57,8 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - Editing deployment or CI configuration (`.github/`, `vercel.json`, `Dockerfile`, any `*.deploy.*` file). **One exception:** `netlify.toml` (build command, publish and functions directories, Node version, function settings) may be created or changed through an approved delegation contract or the `release` skill, and nothing else. Approved by the PO on 2026-10-02: reviewed config-as-code beats manual UI settings that nobody can review.
 - Writing API keys, tokens or secrets in code, docs or commits. They go in `.env` (git-ignored). Only `.env.example` with empty values is committed.
 - Exposing a secret to the browser in any form. Never prefix a secret with `VITE_` (Vite inlines every `VITE_*` variable into the public bundle), and never read a key from browser code, hooks included. Keys are read only by server-side code (ARCHITECTURE.md, ADR-03).
+- Running anything with debug or verbose environment output (`--debug`, `DEBUG=*`, `NODE_DEBUG`, printing `process.env`) while `.env` holds a real key. Local runs of the production setup go through `npm run verify:prod:local`, which blanks every secret. (2026-10-02: a delegated `netlify serve --debug` printed the real key into a local log, and the key had to be rotated.)
+- Starting a server in the background in a headless or delegated session, or leaving one running after a check. Whatever starts a server stops it, in the foreground, before it exits. (Same day: that server outlived its session, holding the key and listening on every interface.)
 - Committing directly without showing me the diff summary first, or using `--no-verify`.
 - Generating code you cannot explain to me in three lines.
 - Disabling a lint rule or TypeScript check to make an error go away.
