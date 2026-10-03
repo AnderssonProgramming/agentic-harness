@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 
 const reportPath = process.argv[2] ?? 'AUDIT-REPORT.md';
 const criteriaIds = [
-  ...readFileSync('AUDIT-CRITERIA.md', 'utf8').matchAll(/^\| ([A-Z]+-\d{2}) \|/gm),
+  ...readFileSync('AUDIT-CRITERIA.md', 'utf8').matchAll(/^\|\s*([A-Z]+-\d{2})\s*\|/gm),
 ].map((m) => m[1]);
 const report = readFileSync(reportPath, 'utf8');
 const RISKS = ['Critical', 'High', 'Medium', 'Low'];
