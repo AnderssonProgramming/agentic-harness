@@ -159,7 +159,7 @@ describe('streamChat', () => {
       expect(error.info.code).toBe('rate_limit');
       expect(error.info.retryable).toBe(true);
       expect(describeChatError(error.info)).toBe(
-        'Too many requests right now. Wait a few seconds and try again.',
+        'Too many requests right now. Wait a couple of minutes and try again.',
       );
       expect(onDelta).not.toHaveBeenCalled();
     },

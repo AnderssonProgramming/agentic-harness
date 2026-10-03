@@ -65,7 +65,7 @@ export function describeChatError(info: ChatErrorInfo): string {
     case 'auth':
       return `${engine} rejected the API key. Check the key in the server's .env file.`;
     case 'rate_limit':
-      return 'Too many requests right now. Wait a few seconds and try again.';
+      return 'Too many requests right now. Wait a couple of minutes and try again.';
     case 'quota':
       return 'The API credits have run out. Switch to the local engine (INFERENCE_ENGINE=ollama) or add credits.';
     case 'overloaded':
