@@ -2,7 +2,8 @@
 // to-dos in storage, the cards come from stored data, failures change nothing, and to-dos and
 // cards survive closing the browser. Amendment 1: several actions in one reply, the reset notice
 // for unreadable to-do data, and an engine without tool calling (MOCK_TOOLS=off): standing notice,
-// app refusal, storage byte-identical. Storage is read and written through the DevTools protocol
+// app refusal for add and complete, storage byte-identical; B-12: "what's on my list" answered
+// from storage with the list card, the model not called. Storage is read and written through the DevTools protocol
 // (DOMStorage), never through the page, so a page that blocks or breaks storage can't fake it.
 //   npm run verify:todos            deterministic, on the mock engine
 //   npm run verify:todos -- --live  with the engine in .env: add, complete, list, context and
@@ -114,6 +115,22 @@ async function reload() {
   await page.evaluate("document.querySelector('#composer-input').focus()");
 }
 
+// The list card a stored list must produce: open first, done ones marked, with the stored count.
+function expectedList(todos) {
+  const open = todos.filter((t) => !t.done);
+  const done = todos.filter((t) => t.done);
+  return {
+    title:
+      todos.length === 0
+        ? 'Your list is empty.'
+        : `Your list has ${String(todos.length)} ${todos.length === 1 ? 'to-do' : 'to-dos'}, ${String(open.length)} open:`,
+    items: [
+      ...open.map((t) => ({ text: t.text, done: false })),
+      ...done.map((t) => ({ text: `Done: ${t.text}`, done: true })),
+    ],
+  };
+}
+
 const SEEDED_TODOS = JSON.stringify({
   version: 1,
   todos: [
@@ -147,6 +164,22 @@ async function engineWithoutActions(label, replyTimeoutMs, { engineInfoDelayMs =
   await page.waitFor(
     "document.querySelector('[data-notice=\"engine\"]')?.classList.contains('todo-notice')",
   );
+  // B-12: listing reads storage, so it needs no model. Empty first, on a fresh profile.
+  const emptyBefore = await stored(TODOS);
+  await ask("What's on my list?");
+  const emptyCard = await lastCard();
+  check(
+    'No tool calling: list (B-12)',
+    `${label}: an empty list gets the empty-list card, with no model text, and nothing is stored`,
+    emptyBefore === null &&
+      emptyCard?.kind === 'listed' &&
+      emptyCard.title === 'Your list is empty.' &&
+      emptyCard.items.length === 0 &&
+      emptyCard.modelText === null &&
+      (await stored(TODOS)) === null,
+    `card: ${emptyCard?.title}; stored before: ${String(emptyBefore)}`,
+  );
+
   await seedAndReload(TODOS, SEEDED_TODOS);
   // The composer renders before GET /api/engine answers, so wait for the notice, never read once.
   const shown = await noticeShown('engine');
@@ -163,26 +196,43 @@ async function engineWithoutActions(label, replyTimeoutMs, { engineInfoDelayMs =
   await ask('Remind me to ask Ana how deploys work.');
   const refusal = await lastCard();
   const afterAdd = await stored(TODOS);
+  await ask('Mark the onboarding one as done');
+  const completeRefusal = await lastCard();
+  const afterComplete = await stored(TODOS);
   await ask("What's on my list?");
-  const listRefusal = await lastCard();
+  const listCard = await lastCard();
+  // Read straight from storage through DevTools, then compared with the card on screen.
   const afterList = await stored(TODOS);
+  const expected = expectedList(JSON.parse(afterList ?? '{"todos":[]}').todos);
   const replyItems = await page.evaluate(
     "[...document.querySelectorAll('.message--assistant')].map((li) => li.querySelector('.message__text')?.textContent ?? null)",
   );
   check(
     'No tool calling: refusal',
-    `${label}: a to-do phrase gets the app's message (not done, and why), no model text, and storage is byte-identical`,
+    `${label}: adding and completing get the app's message (not done, and why), no model text, and storage is byte-identical`,
     refusal?.kind === 'unsupported' &&
       refusal.title ===
         "Not added: the current engine can't run to-do actions, so Compass didn't touch your list." &&
       refusal.modelText === null &&
-      listRefusal?.kind === 'unsupported' &&
-      /^Not shown:/.test(listRefusal.title) &&
-      replyItems.every((text) => text === null) &&
+      completeRefusal?.kind === 'unsupported' &&
+      /^Not marked as done:/.test(completeRefusal.title) &&
+      completeRefusal.modelText === null &&
       before === SEEDED_TODOS &&
       afterAdd === before &&
+      afterComplete === before,
+    `${refusal?.title} | ${completeRefusal?.title} | storage identical: ${String(afterAdd === before && afterComplete === before)}`,
+  );
+  check(
+    'No tool calling: list (B-12)',
+    `${label}: "What's on my list?" shows exactly the stored to-dos in the list card, open first, done ones marked, with no model text, and storage is unchanged`,
+    listCard?.kind === 'listed' &&
+      listCard.title === expected.title &&
+      JSON.stringify(listCard.items) === JSON.stringify(expected.items) &&
+      listCard.items.length === 2 &&
+      listCard.modelText === null &&
+      replyItems.every((text) => text === null) &&
       afterList === before,
-    `${refusal?.title} | ${listRefusal?.title} | storage identical: ${String(afterAdd === before && afterList === before)}`,
+    `card: ${listCard?.title} ${JSON.stringify(listCard?.items)}; stored: ${String(afterList)}`,
   );
 
   await ask('How do we name branches? Answer in one short sentence.', replyTimeoutMs);
@@ -191,7 +241,7 @@ async function engineWithoutActions(label, replyTimeoutMs, { engineInfoDelayMs =
     'No tool calling: other wording',
     `${label}: an ordinary question still reaches the model, and the notice stays`,
     reply.trim() !== '' &&
-      (await cards()).length === 2 &&
+      (await cards()).length === 4 &&
       (await notice('engine')).shown &&
       (await stored(TODOS)) === before,
     reply.slice(0, 120),
@@ -296,18 +346,13 @@ try {
     await ask("What's on my list?");
     const listCard = await lastCard();
     const listStored = await storedTodos();
-    const expectedItems = [
-      ...listStored.filter((t) => !t.done).map((t) => ({ text: t.text, done: false })),
-      ...listStored.filter((t) => t.done).map((t) => ({ text: `Done: ${t.text}`, done: true })),
-    ];
-    const openCount = listStored.filter((t) => !t.done).length;
+    const expected = expectedList(listStored);
     check(
       'List',
       'The card shows exactly the stored to-dos, open first, done ones marked, with the stored count',
       listCard?.kind === 'listed' &&
-        JSON.stringify(listCard.items) === JSON.stringify(expectedItems) &&
-        listCard.title ===
-          `Your list has ${String(listStored.length)} to-dos, ${String(openCount)} open:`,
+        JSON.stringify(listCard.items) === JSON.stringify(expected.items) &&
+        listCard.title === expected.title,
       `card: ${listCard?.title} ${JSON.stringify(listCard?.items)}`,
     );
 
