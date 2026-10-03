@@ -128,7 +128,9 @@ Production is the static app from `dist/` plus two Netlify Functions in `netlify
 5. `npm run deploy:preview`, then `npm run verify:prod -- <draft URL>`.
 6. `npm run deploy:prod` once the preview passes.
 
-`npm run serve:prod` builds the app and serves it with the Functions locally, for `npm run verify:prod -- <local URL>`.
+To check the production build locally, run `npm run verify:prod:local`. In one foreground command it builds the app, serves it with the Functions (`netlify serve --offline`), runs `verify:prod` against `http://localhost:<port>`, stops the server and confirms its ports are closed. `npm run serve:prod [-- --port <n>]` starts the same server by hand, until you press Ctrl+C.
+
+Both always run on the mock engine, with every secret from `.env.example` set to an empty value, so a local production run can never hold a real key. They refuse `--debug`, `DEBUG` and any argument other than `--port` and `--functions-port`. Never run the Netlify CLI with `--debug` or `DEBUG=*` in this project: its debug loggers print the whole environment, keys included.
 
 ## Troubleshooting
 
