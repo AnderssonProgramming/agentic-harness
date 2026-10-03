@@ -37,6 +37,18 @@ Read only these:
 - Verification scripts write screenshots to a temp folder. **Create the folder first:** `verify:chat` doesn't (TECH-DEBT D-05).
 - One commit per step; update B-10's `Status:` to `done` and add `docs/evidence/b-10-verification.md` at the end.
 
+## Plan
+
+Written by the `feature-builder` subagent on 2026-10-03.
+
+| Step | What                                                                                                                                                                                                                  | Files                                                                                 | Criteria |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------- |
+| 1    | This plan                                                                                                                                                                                                             | this file                                                                             | —        |
+| 2    | The four questions as data in `model/`; presentational `StarterQuestions` (buttons, `onPick`, re-checks `checkDraft`); focus style, no motion under reduced motion; component tests                                   | `model/starter-questions.ts`, `components/starter-questions.tsx` (+ test), `chat.css` | 1, 2     |
+| 3    | Show them in `MessageList`'s empty state; `ChatScreen` passes `send` (same path as Enter) and returns focus to the composer; screen tests: click → message + streamed reply, hide, come back after "New conversation" | `message-list.tsx` (+ test), `composer.tsx`, `chat-screen.tsx` (+ test)               | 1, 2, 3  |
+| 4    | `verify:chat`: count the 4 suggestions in the empty state; after "New conversation", click one on the mock engine and watch the reply stream                                                                          | `scripts/verify-chat.mjs`                                                             | 1, 2     |
+| 5    | Run `check`, `verify:chat`, `verify:persistence` into a temp folder; evidence file; B-10 `done`                                                                                                                       | `docs/evidence/b-10-verification.md`, `BACKLOG.md`                                    | 4        |
+
 ## How you deliver
 
 Commits with hashes; each criterion with its evidence; **"Decisions I made that this contract didn't cover"**; the final `check` result.
