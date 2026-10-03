@@ -1,0 +1,21 @@
+{
+  "description": "Release to Netlify: gate, notes, draft, verify, publish the verified draft, record",
+  "requires": [
+    "netlify-cli (devDependency)",
+    "a verify:prod script that takes a URL",
+    "netlify.toml"
+  ],
+  "scripts": {
+    "release:gate": "node scripts/release-gate.mjs",
+    "release:notes": "node scripts/release-notes.mjs",
+    "release:deploy": "node scripts/release-deploy.mjs"
+  },
+  "allow": [
+    "Skill(release)",
+    "Bash(npm run release:gate)",
+    "Bash(npm run release:notes:*)",
+    "Bash(npm run -s release:deploy:*)",
+    "Bash(npm run verify:prod:*)",
+    "Bash(npm version:*)"
+  ]
+}
