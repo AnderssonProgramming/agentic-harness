@@ -186,4 +186,4 @@ Acceptance criteria:
 
 Origin: the PO's ADR-11 review, correction 4. The first `phi3` reply timed out twice in week 6.
 
-Status: pending
+Status: done (2026-10-03, delegated; evidence: `docs/evidence/b-13-verification.md`)
