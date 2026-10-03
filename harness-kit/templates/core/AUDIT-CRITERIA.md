@@ -1,6 +1,6 @@
 # Audit criteria
 
-The checklist the `audit` skill runs against. **Write it before running any audit**, from the product's promises (backlog criteria, ADRs), not from reading the code. Keep 15–25 checks. Each one has a fixed method and a default risk, so two runs can be compared.
+The checklist the `audit` skill runs against. **Write it before running any audit**, from the product's promises (backlog criteria, ADRs), not from reading the code. Keep only the checks that apply to this product (Compass has 25; a small CLI may need 10). Each one has a fixed method and a default risk, so two runs can be compared.
 
 Rules for the auditor:
 

@@ -45,7 +45,7 @@ claude -p "<your request>" --add-dir .. --permission-mode acceptEdits --allowedT
      - replace its `test` script, which always fails (`echo "Error: no test specified" && exit 1`);
      - set `"type": "module"` if you write ES modules (npm 11 writes `"commonjs"`).
 
-   Then `git init`, and make sure `.gitignore` contains `.env`.
+   Then `git init`, and make sure `.gitignore` contains `.env`. On Windows, also add a `.gitattributes` with `* text=auto eol=lf`: otherwise git checks files out with CRLF endings and the formatter check fails on every fresh clone.
 
    Also install the formatter, linter and test runner that `check` will run, **now**, with exact versions (`npm install -D -E …`). Write those versions into `CLAUDE.md`'s "Stack and versions" in step 4: an unpinned install today may get a newer major than your examples assume. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one.
 
@@ -68,7 +68,7 @@ claude -p "<your request>" --add-dir .. --permission-mode acceptEdits --allowedT
    node <kit>/install.mjs <project dir> --name "My Product"
    ```
 
-   Add `--profile netlify` if the project deploys to Netlify (see "Profiles"). The installer never overwrites an existing file; it lists the ones it kept. It adds the `audit:*` and `context:profile` npm scripts. **Then run `format`:** the installed Markdown and JSON aren't in your formatter's style yet, and `check` would fail on them.
+   Add `--profile netlify` if the project deploys to Netlify (see "Profiles"). The installer never overwrites an existing file; it lists the ones it kept. It adds the `audit:*` and `context:profile` npm scripts. **Then run `format`:** some installed files (in one test, the three `scripts/*.mjs`) won't match your formatter's settings, and `check` would fail on them.
 
 4. **Fill in the fields.** Every `{{FIELD}}` in the installed files is a decision only you can make:
    - **`CLAUDE.md`:** what the product is and for whom, the stack with pinned versions, approved dependencies, code standards, commands. **Required before the first session.**
@@ -100,7 +100,7 @@ claude -p "<your request>" --add-dir .. --permission-mode acceptEdits --allowedT
    2. after your "approved", execute one step per commit, running `format` and `check` each time;
    3. report each criterion with its evidence.
 
-   If it codes without a plan, `CLAUDE.md` isn't being read: check that it's at the project root.
+   If it codes without a plan, `CLAUDE.md` isn't being read: check that it's at the project root. When an item adds a command the agent must run to verify it (e.g. `npm run split`), add it to `.claude/settings.json` → `allow` in the same commit. Otherwise every run asks, and a headless session stops there.
 
 ### Profiles
 

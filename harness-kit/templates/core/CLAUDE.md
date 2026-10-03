@@ -21,7 +21,7 @@ Current state: {{WHAT_WORKS_TODAY_AND_WHAT_DOES_NOT}}
 - Framework: {{FRAMEWORK_AND_VERSION}}.
 - Package manager: {{PACKAGE_MANAGER}}. Commit the lockfile.
 - Runtime: {{RUNTIME_AND_MIN_VERSION}}.
-- Lint and format: {{LINTER}}, {{FORMATTER}}.
+- Lint, format and test: {{LINTER_OR_NONE}}, {{FORMATTER}}, {{TEST_RUNNER}}, with pinned versions.
 
 ### Approved dependencies
 
@@ -114,7 +114,7 @@ A skill is listed here only after passing the reliability test: three runs in a 
 ## Commands
 
 - `{{INSTALL_COMMAND}}`: install dependencies.
-- `{{DEV_COMMAND}}`: run the app locally.
-- `{{CHECK_COMMAND}}`: typecheck, lint, format check and tests. It must pass before any commit.
+- `{{DEV_COMMAND}}`: run the app locally (or the CLI; delete this line if neither exists yet).
+- `{{CHECK_COMMAND}}`: everything that must pass before any commit (e.g. typecheck, lint, format check, tests).
 - `npm run context:profile -- <run.jsonl>`: context usage of a headless session.
 - `npm run audit:facts` and `npm run audit:validate`: used by the audit skill.
