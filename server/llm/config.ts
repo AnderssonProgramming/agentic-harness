@@ -12,6 +12,17 @@ const FIRST_CHUNK_TIMEOUT_MS: Readonly<Record<EngineName, number>> = {
   mock: 30_000,
 };
 
+/**
+ * Most characters of the team's documents each engine receives (ADR-12). Ollama's small default
+ * context silently truncates a long prompt; the mock gets Ollama's size so tests see the small case.
+ * The prompt bound (LLM-05) is derived from this table: `maxPromptAdditions` in knowledge.ts.
+ */
+const KNOWLEDGE_BUDGET_CHARS: Readonly<Record<EngineName, number>> = {
+  anthropic: 40_000,
+  ollama: 8_000,
+  mock: 8_000,
+};
+
 export const LLM_CONFIG = {
   route: '/api/chat',
   /** GET: the active engine and whether it can run to-do actions (ADR-11). */
@@ -28,4 +39,9 @@ export const LLM_CONFIG = {
   /** After the first chunk, the server gives up when the engine sends nothing for this long. */
   idleTimeoutMs: 20_000,
   maxRequestBytes: 256_000,
+  /** The team's documents: `knowledge/*.md` under the project root (B-06, ADR-12). */
+  knowledgeDir: 'knowledge',
+  knowledgeBudgetChars: KNOWLEDGE_BUDGET_CHARS,
+  /** A document larger than this (50 KB) is skipped whole, with a warning. */
+  knowledgeMaxFileBytes: 50 * 1024,
 } as const;
