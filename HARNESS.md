@@ -18,7 +18,14 @@ Each rule in it exists because something failed without it. The table in "Learne
 
 You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it goes into an existing project with a `package.json`.
 
-1. **Create the project and a git repository.** Any npm project works. For example, `npm create vite@latest my-app -- --template react-ts`, then `cd my-app`, `npm install`, and `git init`. Make sure `.gitignore` contains `.env`.
+1. **Create the project, its tools and a git repository.** Any npm project works. For example:
+   - `npm create vite@latest my-app -- --template react-ts`
+   - `cd my-app`
+   - `npm install`
+   - `git init`
+
+   Also install the formatter, linter and test runner that step 3's `check` will run, **now**. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one. Make sure `.gitignore` contains `.env`.
+
 2. **Copy the kit and install it.** Copy the `harness-kit/` folder from this repository into the new project, then run:
 
    ```sh
@@ -32,7 +39,7 @@ You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it 
    - `check`: everything that must pass before a commit, e.g. `tsc --noEmit && eslint . && prettier --check . && vitest run`
    - `test`: the tests, once
 
-   Install the tools they need first. If `check` doesn't exist, the agent has nothing to stop it from committing broken code.
+   The tools come from step 1. If `check` doesn't exist, the agent has nothing to stop it from committing broken code.
 
 4. **Fill in the fields.** Every `{{FIELD}}` in the installed files is a decision only you can make:
    - **`CLAUDE.md`:** what the product is and for whom, the stack, approved dependencies, code standards, commands. **Required before the first session.**
