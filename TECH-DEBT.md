@@ -26,6 +26,7 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Why not now:** no keys or user content are in those bodies (`verify:llm` scans for keys), and it's visible only in DevTools on the user's own machine. Fixing it means changing what the protocol carries (ADR-09).
 - **When to fix:** when the app is exposed to users other than its owner (after week 8's deployment). At that point, add **ERR-04** to AUDIT-CRITERIA.md: "Provider error details never leave the server; the browser receives only the code and engine."
 - **2026-10-02, at deployment: re-deferred by the PO.** The trigger fired (the app is going public), and the PO chose to ship without fixing it. The deployment subagent and the PO session both raised it. It stays Low: the bodies hold no keys or user content, and they're visible only in the user's own DevTools and storage. **New trigger:** the next audit cycle, or any report of a provider body exposing something sensitive.
+- **2026-10-03, first production release:** seen live. A production `config` error tells the user to "Set it in .env (without a VITE_ prefix)", developer advice that's wrong and confusing in production. Fold it into the same fix (ERR-04).
 
 ## [D-04] The audit criteria can't see failures that need sequences or scale (lesson from P-01)
 
