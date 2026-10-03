@@ -158,6 +158,13 @@ Rejected alternatives:
 - Passing the provider's own stream through: rejected because the browser would need two parsers and would see provider-specific errors.
 - HTTP status codes for errors: rejected because once streaming starts the status is already sent, so mid-stream failures need an in-band event anyway. Using one mechanism for both is simpler.
 
+**B-13 update (2026-10-03, accepted by the PO):** the stream has **two server timeouts**, both ending in the existing `timeout` event, so the protocol is unchanged:
+
+- a per-engine **first-chunk timeout**: 120 s for Ollama, because a cold model loads on CPU; 30 s for Anthropic and the mock;
+- the unchanged 20 s **idle timeout** between chunks.
+
+The browser waits 150 s for the first chunk, longer than any server limit, so the server's `timeout` always arrives first. After that, it keeps its 30 s gap between chunks. **Rejected:** one longer idle timeout for everything, because it would also delay detecting a stream that stalls mid-reply.
+
 ## [ADR-10] The conversation is saved through a synchronous store in `api/`
 
 Date: 2026-10-01
