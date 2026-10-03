@@ -35,3 +35,14 @@ Delegated to: the `feature-builder` subagent, in one bounded session. This contr
 ## How you deliver
 
 Commits with hashes; each criterion with its evidence; **"Decisions I made that this contract didn't cover"**; the final `check` result.
+
+## Plan
+
+Written by the `feature-builder` subagent. Detection lives in the **browser** (Decision 2): the server already holds every to-do phrase back from an engine without actions (`isTodoRequest` in `chat-core.ts`), so the protocol doesn't change.
+
+| #   | Step                                                                                                                                                                                               | Files                                                                                     | Criteria       |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------- |
+| 1   | This plan                                                                                                                                                                                          | `docs/delegations/b-12-list-from-storage.md`                                              | —              |
+| 2   | On an engine without actions, each phrase the shared matcher finds becomes a card in order: `list` runs on storage, `add`/`complete` keep the refusal. Unit tests, including "engine never called" | `src/features/chat/hooks/use-chat.ts`, `use-chat.test.ts`, `server/llm/chat-core.test.ts` | 1, 2, 3, 4     |
+| 3   | `verify:todos` MOCK_TOOLS=off scenario: empty-list card, list card compared with storage read through DevTools, add/complete refused with storage byte-identical                                   | `scripts/verify-todos.mjs`                                                                | 1, 2, 4, 5     |
+| 4   | ADR-11 "B-12 update", Decision index row, evidence file, B-12 `done`                                                                                                                               | `ARCHITECTURE.md`, `docs/evidence/b-12-verification.md`, `BACKLOG.md`                     | all (evidence) |
