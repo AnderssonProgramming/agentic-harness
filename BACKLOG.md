@@ -84,7 +84,7 @@ Acceptance criteria:
 - Asking "What is our branch naming convention?" returns the answer written in `knowledge/`.
 - Files larger than 50 KB are skipped and listed in a warning in the console.
 
-Status: pending
+Status: done
 
 ### [B-07] Cited answers
 

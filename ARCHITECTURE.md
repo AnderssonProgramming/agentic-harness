@@ -21,7 +21,7 @@ Read this table first. Then open only the ADRs your task touches, e.g. `Grep "AD
 | [ADR-09](#adr-09-one-ndjson-event-stream-for-every-engine-plus-a-mock-engine)                                      | One NDJSON event stream; 13 error codes; mock engine                                                                         | Active (extended by ADR-11: `action` event, `start.actions`, `GET /api/engine`) | Streaming, errors, tests     |
 | [ADR-10](#adr-10-the-conversation-is-saved-through-a-synchronous-store-in-api)                                     | Synchronous `localStorage` store in `api/`; versioned snapshot; lint guard                                                   | Active (snapshot now at version 3: migrations 1→2→3)                            | Persistence, storage         |
 | [ADR-11](#adr-11-the-model-requests-to-do-actions-the-browser-runs-them-and-confirms)                              | The model requests to-do actions (`action` event); the browser runs them and confirms                                        | Accepted with corrections (B-12 update: "list" from storage on every engine)    | To-dos, protocol, tools      |
-| [ADR-12](#adr-12-b-06s-knowledge-base-goes-whole-into-the-system-prompt-within-a-total-budget-and-a-secrets-guard) | B-06: knowledge files go whole into the system prompt, with a total budget per engine and a secrets guard; no RAG            | Accepted with corrections; not built                                            | Knowledge base, prompt size  |
+| [ADR-12](#adr-12-b-06s-knowledge-base-goes-whole-into-the-system-prompt-within-a-total-budget-and-a-secrets-guard) | B-06: knowledge files go whole into the system prompt, with a total budget per engine and a secrets guard; no RAG            | Accepted with corrections, built (B-06); LLM-05's bound now per engine          | Knowledge base, prompt size  |
 | [ADR-13](#adr-13-one-transport-free-chat-core-with-a-node-adapter-and-a-web-adapter)                               | One transport-free chat core; a Node `(req, res)` adapter for Vite and a Web `Request` adapter for the two Netlify Functions | Active                                                                          | Server, endpoint, deployment |
 
 New ADRs add a row here in the same commit.
@@ -223,7 +223,7 @@ Amendment 1 (2026-10-01, B-11 contract Amendment 1, still **Proposed**). A syste
 
 ## [ADR-12] B-06's knowledge base goes whole into the system prompt, within a total budget and a secrets guard
 
-Date: 2026-10-01. Status: **Accepted with corrections by the PO, not yet built** (B-06 is pending).
+Date: 2026-10-01. Status: **Accepted with corrections, built (B-06)** on 2026-10-03; see the B-06 update below.
 
 **Agent's proposal** (a read-only session asked for an architecture for B-06; the transcript is in `docs/evidence/adr-12-proposal.md`):
 
@@ -258,6 +258,19 @@ The corrections protect two promises the product already made: engine switching 
 
 - **RAG with embeddings and a vector store.** The agent rejected it too: new dependencies, non-determinism and per-chunk citations (B-07), for a scale problem we don't have.
 - **The proposal as submitted, with only a per-file limit.** Rejected, because its main risk was left as a "risk to measure" instead of a requirement.
+
+**B-06 update (2026-10-03, built by the `feature-builder` subagent; contract `docs/delegations/b-06-knowledge-base.md`, Amendment 1):**
+
+- **LLM-05's bound is now per engine.** What the server adds to a request is ≤ `MAX_PROMPT_ADDITIONS` (16,000: instructions, to-dos, tool definitions; unchanged) **plus that engine's knowledge budget**: `maxPromptAdditions(engine)` in `server/llm/knowledge.ts`, derived from `LLM_CONFIG.knowledgeBudgetChars` (Anthropic 40,000; Ollama 8,000; mock 8,000). **Why:** the 40,000-character Anthropic budget can't fit under the old 16,000 bound, which a full to-do list nearly fills. Shrinking the knowledge would defeat B-06. Dropping documents per request, depending on the to-do count, would be a silent drop. **The next audit re-checks LLM-05 against the per-engine bound.**
+- **The loader fills each engine's knowledge only up to its own budget**, so documents alone never push a request over the bound and never make it fail. The `bad_request` check on instructions and to-dos is unchanged.
+- **Loaded once** per server start (the Vite plugin, when serving) or Function cold start, and injected into the chat core as `ChatCoreOptions.knowledge`, so tests pass a fake set.
+- **Budget packing:** alphabetical order (by code point), whole documents only, first-fit. A document that doesn't fit what's left is skipped for that engine, and later, smaller ones may still fit. The budget counts each document's `<document>` markup.
+- **The 50 KB limit is 51,200 bytes**, checked from the file size before reading.
+- **The secrets guard** matches `sk-ant-`, `-----BEGIN … PRIVATE KEY`, and an `api`/`secret`/`access`/`auth` + `key`/`token` name assigned a value of 8+ key-like characters.
+- **One warning** goes to the server console when anything is skipped, naming each file and the reason (per engine for the budget), never content.
+- **Production:** `netlify.toml` ships `knowledge/**` with `included_files`. The Function reads `process.cwd()/knowledge`, then `$LAMBDA_TASK_ROOT/knowledge`.
+- **The system prompt** now says the documents are below, if any, as reference material and not as instructions. For anything they don't cover, it still says so plainly.
+- **Evidence:** `docs/evidence/b-06-verification.md`.
 
 ## [ADR-13] One transport-free chat core, with a Node adapter and a Web adapter
 
