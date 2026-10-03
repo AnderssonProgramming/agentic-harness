@@ -25,6 +25,7 @@
     "verify:todos": "node scripts/verify-todos.mjs",
     "verify:prod": "node scripts/verify-prod.mjs",
     "serve:prod": "node scripts/serve-prod.mjs",
+    "verify:prod:local": "node scripts/verify-prod-local.mjs",
     "deploy:preview": "netlify deploy --build",
     "deploy:prod": "netlify deploy --build --prod",
     "context:profile": "node scripts/context-profile.mjs",
