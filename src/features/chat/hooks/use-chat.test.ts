@@ -5,7 +5,7 @@ import { chatError } from '../../../shared/llm/errors';
 import type { ChatTurn } from '../../../shared/llm/protocol';
 import type { SendChat } from '../api/chat-api';
 import type { ConversationStore, LoadResult, StoreResult } from '../api/conversation-store';
-import type { TodoActions, TodoCard } from '../../todos';
+import { createTodoActions, type TodoActions, type TodoCard } from '../../todos';
 import type { Message } from '../model/message';
 import { TEXT_SAVE_INTERVAL_MS, useChat } from './use-chat';
 
@@ -284,13 +284,15 @@ describe('useChat', () => {
         expect(other.result.current.engineActions).toBe(true);
       });
 
-      it('replies to a to-do phrase with refusal cards and never touches the list', async () => {
+      it('refuses adding and completing with refusal cards and never touches the list', async () => {
         const model = controllableSend();
         const { store, state } = fakeStore();
         const todos = fakeTodos();
         const { result } = renderChat(model.send, store, todos);
         act(() => {
-          result.current.send("Remind me to ask Ana how deploys work. What's on my list?");
+          result.current.send(
+            'Remind me to ask Ana how deploys work. Mark the deploy one as done.',
+          );
         });
         await act(async () => {
           model.last().options.onStart?.(noActions);
@@ -300,7 +302,7 @@ describe('useChat', () => {
         expect(todos.execute).not.toHaveBeenCalled();
         const refused = [
           { status: 'settled', card: { kind: 'unsupported', action: 'add' } },
-          { status: 'settled', card: { kind: 'unsupported', action: 'list' } },
+          { status: 'settled', card: { kind: 'unsupported', action: 'complete' } },
         ];
         expect(result.current.messages.at(-1)).toMatchObject({
           text: '',
@@ -309,6 +311,92 @@ describe('useChat', () => {
         });
         expect(state.saved?.at(-1)?.actions).toEqual(refused);
         expect(result.current.engineActions).toBe(false);
+      });
+
+      it('answers "what\'s on my list" from the list, in order with the refusals (B-12)', async () => {
+        const model = controllableSend();
+        const { store, state } = fakeStore();
+        const listed: TodoCard = {
+          kind: 'listed',
+          todos: [{ id: 't1', text: 'ask Ana how deploys work', done: false }],
+        };
+        const todos = fakeTodos(listed);
+        const { result } = renderChat(model.send, store, todos);
+        act(() => {
+          result.current.send("Remind me to read the deploy guide. What's on my list?");
+        });
+        await act(async () => {
+          model.last().options.onStart?.(noActions);
+          model.last().finish();
+          await Promise.resolve();
+        });
+        expect(vi.mocked(todos.execute).mock.calls).toEqual([[{ kind: 'list' }]]);
+        const cards = [
+          { status: 'settled', card: { kind: 'unsupported', action: 'add' } },
+          { status: 'settled', card: listed },
+        ];
+        expect(result.current.messages.at(-1)).toMatchObject({
+          text: '',
+          status: 'done',
+          actions: cards,
+        });
+        expect(state.saved?.at(-1)?.actions).toEqual(cards);
+      });
+
+      /** The real executor over an in-memory stored list that records every write. */
+      function storedList(stored: { id: string; text: string; done: boolean }[]) {
+        const writes = { count: 0 };
+        const todos = createTodoActions({
+          load: () => ({
+            ok: true,
+            reset: false,
+            todos: stored.map((todo, index) => ({
+              ...todo,
+              createdAt: index,
+              doneAt: todo.done ? index : null,
+            })),
+          }),
+          save: () => {
+            writes.count++;
+            return { ok: true };
+          },
+        });
+        return { todos, writes };
+      }
+
+      it.each([
+        [
+          'a stored list: open first, done ones marked',
+          [
+            { id: 'a', text: 'set up the VPN', done: true },
+            { id: 'b', text: 'ask Ana how deploys work', done: false },
+          ],
+          [
+            { id: 'b', text: 'ask Ana how deploys work', done: false },
+            { id: 'a', text: 'set up the VPN', done: true },
+          ],
+        ],
+        ['an empty list: the empty-list card, not a model reply', [], []],
+      ])('builds the list card from storage for %s (B-12)', async (_, stored, shown) => {
+        const model = controllableSend();
+        const { todos, writes } = storedList(stored);
+        const { result } = renderChat(model.send, fakeStore().store, todos);
+        act(() => {
+          result.current.send("What's on my list?");
+        });
+        await act(async () => {
+          model.last().options.onStart?.(noActions);
+          model.last().finish();
+          await Promise.resolve();
+        });
+        expect(result.current.messages.at(-1)).toEqual(
+          expect.objectContaining({
+            text: '',
+            status: 'done',
+            actions: [{ status: 'settled', card: { kind: 'listed', todos: shown } }],
+          }),
+        );
+        expect(writes.count).toBe(0);
       });
 
       it('lets other wording reach the model as before', async () => {

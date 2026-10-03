@@ -141,11 +141,15 @@ export function useChat({
             update((current) => startAction(current, replyId, action));
           },
         });
-        // An engine without tool calling never sees a to-do request (the server holds it back):
-        // the app says it wasn't done, and storage is never touched (ADR-11, Amendment 1).
-        const refused = engine.canAct ? [] : todoPhraseActions(lastUserTurn(history));
-        if (refused.length > 0) {
-          update((current) => settleActions(current, replyId, refused.map(unsupportedCard)));
+        // An engine without tool calling never sees a to-do request (the server holds it back).
+        // Listing only reads storage, so the app answers it itself; adding and completing are
+        // refused with nothing touched (ADR-11, Amendment 1 and the B-12 update).
+        const phrases = engine.canAct ? [] : todoPhraseActions(lastUserTurn(history));
+        if (phrases.length > 0) {
+          const cards = phrases.map((action) =>
+            action.kind === 'list' ? todos.execute(action) : unsupportedCard(action),
+          );
+          update((current) => settleActions(current, replyId, cards));
         } else if (requested.length > 0) {
           // Runs only once the reply is complete, so a failed or stopped reply changes nothing.
           // In order, each on what the previous one stored, each with its own card.

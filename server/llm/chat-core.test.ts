@@ -5,6 +5,7 @@ import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import { runChat } from './chat-core.ts';
 import { LLM_CONFIG } from './config.ts';
 import type { Env } from './engine.ts';
+import { mockEngine } from './engines/mock.ts';
 import type { Engine, EngineName } from './engines/types.ts';
 import { upstreamFailure } from './errors.ts';
 
@@ -124,4 +125,48 @@ describe('first-chunk and idle timeouts (B-13)', () => {
       });
     },
   );
+});
+
+describe('to-do phrases on an engine without actions (B-12)', () => {
+  // The mock pauses between words with setTimeout.
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Runs one request on the mock with MOCK_TOOLS=off, with a spy on its stream function. */
+  async function ask(content: string) {
+    const engine = mockEngine({ delayMs: 0, tools: false });
+    const stream = vi.spyOn(engine, 'stream');
+    const events: StreamEvent[] = [];
+    await runChat(
+      { env: () => env, engineFor: () => engine },
+      {
+        readBody: () => Promise.resolve({ messages: [{ role: 'user', content }], todos: [] }),
+        send: (event) => events.push(event),
+        clientGone: new AbortController().signal,
+      },
+    );
+    return { stream, events };
+  }
+
+  it('calls the engine for ordinary wording, so the spy can see a call', async () => {
+    const { stream, events } = await ask('How do we name branches?');
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toEqual({ type: 'done' });
+  });
+
+  it.each([
+    "What's on my list?",
+    'what’s on my to-do list',
+    'Remind me to ask Ana how deploys work.',
+    'Mark the deploy one as done',
+    "Remind me to read the deploy guide. What's on my list?",
+  ])('never calls the engine for "%s": start, then done', async (content) => {
+    const { stream, events } = await ask(content);
+    expect(stream).not.toHaveBeenCalled();
+    expect(events).toEqual([
+      { type: 'start', engine: 'mock', model: 'echo', actions: false },
+      { type: 'done' },
+    ]);
+  });
 });
