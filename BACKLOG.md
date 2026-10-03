@@ -172,7 +172,7 @@ Acceptance criteria:
 
 Origin: the PO's ADR-11 review, correction 3. The B-11 amendment said "not performed" for every phrase, and that contradicted the feature's own principle (data, not model).
 
-Status: pending
+Status: done (evidence: `docs/evidence/b-12-verification.md`)
 
 ### [B-13] The local engine's first reply doesn't time out while the model loads
 
