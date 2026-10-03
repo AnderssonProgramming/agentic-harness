@@ -113,6 +113,8 @@ A file in `docs/delegations/` with `Status: approved` is a plan I have already a
 
 Always product questions, even when they look technical: **anything that silently drops user data or part of a user's request** (resetting unreadable data with no notice, ignoring a second action, truncating input). Stop and ask; don't pick the quiet option. Also, **a prompt instruction is never the control** for something a criterion forbids. If the model mustn't claim an action happened, the app must make the claim impossible or visibly contradicted. (B-11, pass 1: both happened.)
 
+**Limits are written as invariants on the outcome**, not as limits on each element. Write "what reaches the model is bounded, whatever the request's shape", not "4,000 characters per message". Prove them with a deterministic property-style test over many shapes **and sequences** (`server/llm/prompt-invariants.test.ts` is the pattern). Per-element limits passed every test in week 7 and were still bypassed twice, and the property test then found a High defect the audit couldn't see.
+
 Verification scripts write screenshots to a scratch folder (`npm run verify:chat -- <tmp dir>`) unless the task is updating the evidence. Committed evidence must not change as a side effect of running a check.
 
 ## Available skills
@@ -123,6 +125,8 @@ A listed skill's `SKILL.md` is a plan I have already approved. When I ask for a 
 
 - `new-route`: adds a new top-level screen (route, feature folder, typed view, state hook with loading and error states, `api/` integration point) and verifies it in a real browser. Use it when asked for a new screen, page, route or section, or via `/new-route <name> [path] [title]`. Don't use it to change an existing screen. Reliability evidence: `docs/evidence/skill-new-route-reliability.md`.
 - `llm-connect`: generates the conversational connection to a model: a server-side endpoint, Anthropic, Ollama and mock engines, streaming, typed errors, tests and `verify:llm`. Use it when a project needs an LLM for the first time, or via `/llm-connect <item-id>`. Don't use it to change an existing connection. Reliability evidence: `docs/evidence/skill-llm-connect-reliability.md`.
+
+- `audit`: runs `AUDIT-CRITERIA.md` and writes a risk-classified, validated `AUDIT-REPORT.md` (plus a dated copy in `docs/audit/`). Use it before every deployment and after fixes, or via `/audit`. It never fixes or commits: the PO triages, and the fixes are delegated per finding. Reproducibility: `docs/audit/reproducibility/README.md`; 5 runs, the same failed criteria on the same code.
 
 A skill is only listed here after it has passed the reliability test: three runs in a row, in fresh sessions, with no manual touch-ups (evidence in `docs/evidence/`).
 
