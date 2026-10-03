@@ -20,7 +20,15 @@ You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it 
 
 ### Before you start: permissions
 
-If an agent does the install for you, it needs to run these without asking. In an interactive session, approve them when asked. In a headless one (`claude -p`), pass them with `--allowedTools`, or the install stops at the first one:
+If an agent does the install for you, start it **in the project folder** and give it read access to the kit and this manual. By default, Claude Code only reads the folder it was started in:
+
+```sh
+claude --add-dir <folder holding HARNESS.md and harness-kit/>
+```
+
+In a session that's already running, use `/add-dir`. In this repository, that folder is the repository root.
+
+It also needs to run these without asking. In an interactive session, approve them when asked. In a headless one (`claude -p`), pass them with `--allowedTools`, or the install stops at the first one:
 
 - `npm init` and `npm install` (step 1 only);
 - `git init`, `git add`, `git commit`;
