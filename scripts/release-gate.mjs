@@ -7,6 +7,7 @@
 // Usage: npm run release:gate   (prints JSON; exit 0 = may release)
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { assessDependencies } from './lib/dependency-scope.mjs';
 
 const config = existsSync('harness.config.json')
   ? (JSON.parse(readFileSync('harness.config.json', 'utf8')).release ?? {})
@@ -20,11 +21,13 @@ const run = (command) =>
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+// stdout and stderr stay separate: npm ls and npm audit exit non-zero but still print valid JSON
+// on stdout, and mixing in stderr made that JSON unreadable.
 const attempt = (command) => {
   try {
-    return { ok: true, out: run(command) };
+    return { ok: true, out: run(command), err: '' };
   } catch (error) {
-    return { ok: false, out: `${String(error.stdout ?? '')}${String(error.stderr ?? '')}` };
+    return { ok: false, out: String(error.stdout ?? ''), err: String(error.stderr ?? '') };
   }
 };
 const checks = [];
@@ -106,47 +109,54 @@ check(
 );
 
 // 4. npm advisories only inside the subtrees of packages the PO accepted (docs/audit/accepted-risks.md).
-const auditJson = attempt('npm audit --json');
-let advisories = {};
-try {
-  advisories = JSON.parse(auditJson.out).vulnerabilities ?? {};
-} catch {
-  check('advisories-contained', false, 'npm audit output was not JSON (offline?)');
-}
-// An advisory is contained only if no top-level dependency outside ROOTS can reach the package.
-let tree = {};
-try {
-  tree = JSON.parse(attempt('npm ls --all --json').out).dependencies ?? {};
-} catch {
-  check('advisories-contained', false, 'npm ls output was not JSON');
-}
-const reachable = new Set();
-const seen = new Set();
-const walk = (deps) => {
-  for (const [name, node] of Object.entries(deps ?? {})) {
-    reachable.add(name);
-    const key = `${name}@${String(node.version)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    walk(node.dependencies);
+// A risk is contained only if no top-level dependency outside ROOTS can reach the package. Each
+// check is recorded exactly once: unreadable input is a failure, never a pass next to a failure.
+const parse = (text) => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 };
-walk(Object.fromEntries(Object.entries(tree).filter(([name]) => !ROOTS.includes(name))));
-const outside = Object.keys(advisories).filter((name) => reachable.has(name));
-check(
-  'advisories-contained',
-  outside.length === 0,
-  outside.length === 0
-    ? `${String(Object.keys(advisories).length)} advisories, all inside ${ROOTS.join(', ') || 'no accepted package'}`
-    : `outside the accepted packages: ${outside.join(', ')}`,
-);
+const auditJson = parse(attempt('npm audit --json').out);
+const lsJson = parse(attempt('npm ls --all --json').out);
+const inside = ROOTS.join(', ') || 'no accepted package';
+if (!auditJson || !lsJson) {
+  const which = !auditJson ? 'npm audit' : 'npm ls';
+  check('advisories-contained', false, `${which} output was not JSON (offline?)`);
+  check('deps-tree-contained', false, `${which} output was not JSON (offline?)`);
+} else {
+  const advisories = auditJson.vulnerabilities ?? {};
+  const deps = assessDependencies({
+    tree: lsJson.dependencies ?? {},
+    problems: lsJson.problems ?? [],
+    advisories,
+    roots: ROOTS,
+  });
+  check(
+    'advisories-contained',
+    deps.advisoriesOutside.length === 0,
+    deps.advisoriesOutside.length === 0
+      ? `${String(Object.keys(advisories).length)} advisories, all inside ${inside}`
+      : `outside the accepted packages: ${deps.advisoriesOutside.join(', ')}`,
+  );
+  check(
+    'deps-tree-contained',
+    deps.problemsOutside.length === 0,
+    deps.problemsOutside.length === 0
+      ? `${String(deps.problemsInside)} npm ls problem(s), all inside ${inside}`
+      : `npm ls problems outside the accepted packages: ${deps.problemsOutside.join('; ')}`,
+  );
+}
 
 // 5. The full check passes on exactly this commit.
 const full = attempt('npm run -s check');
 check(
   'check-passes',
   full.ok,
-  full.ok ? 'npm run check' : full.out.split('\n').filter(Boolean).slice(-6).join(' | '),
+  full.ok
+    ? 'npm run check'
+    : `${full.out}${full.err}`.split('\n').filter(Boolean).slice(-6).join(' | '),
 );
 
 const ok = checks.every((c) => c.pass);
