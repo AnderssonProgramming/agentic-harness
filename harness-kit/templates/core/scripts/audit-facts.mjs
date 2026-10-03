@@ -175,10 +175,17 @@ const corpus =
 const used = (name) => {
   if (corpus.includes(`'${name}`) || corpus.includes(`"${name}`)) return true;
   if (name.startsWith('@types/')) return true; // type packages are used by the compiler, not imported
-  const bin = name.split('/').at(-1);
-  return new RegExp(`(^|[\\s"'])${bin}(\\s|$|")`, 'm').test(
-    JSON.stringify(pkg.scripts ?? {}).replace(/\\"/g, '"'),
-  );
+  // A package can be used only through its binaries (typescript → tsc), so check each bin name.
+  let bins = [name.split('/').at(-1)];
+  try {
+    const meta = JSON.parse(readFileSync(join('node_modules', name, 'package.json'), 'utf8'));
+    if (typeof meta.bin === 'string') bins = [name.split('/').at(-1)];
+    else if (meta.bin) bins = [...bins, ...Object.keys(meta.bin)];
+  } catch {
+    // not installed: fall back to the package name
+  }
+  const scripts = JSON.stringify(pkg.scripts ?? {}).replace(/\\"/g, '"');
+  return bins.some((bin) => new RegExp(`(^|[\\s"'])${bin}(\\s|$|")`, 'm').test(scripts));
 };
 const licenseOf = (name) => {
   try {
