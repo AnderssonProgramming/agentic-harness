@@ -40,7 +40,39 @@ npm run verify:prod -- http://localhost:8888
 
 Expected: every check passes with `"engine": "mock"`.
 
+## Amendment 1 (second pass, 2026-10-02)
+
+| Criterion                                   | Status      | Evidence                                                                                                                                                                                                                                  |
+| ------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `netlify.toml` holds every build setting    | Met         | `netlify.toml`: `npm run build`, `dist`, `netlify/functions`, `NODE_VERSION = "22"`. `netlify serve` reported `commandOrigin: config` and `publishOrigin: config`. The README's "Deploy (Netlify)" section has no UI build-settings step. |
+| Two Functions, each with its own rule       | Met         | `netlify/functions/chat.ts` (6 per 180 s) and `engine.ts` (60 per 180 s). `server/llm/netlify-function.test.ts` checks both configs, and that their paths equal `LLM_CONFIG.route` and `LLM_CONFIG.engineRoute`.                          |
+| Rate-limit text                             | Met         | `describeChatError` now says "…Wait a couple of minutes and try again."; `client.test.ts` asserts it, and `verify:chat` shows it in the browser.                                                                                          |
+| `serve:prod` + `verify:prod` locally (mock) | **Blocked** | See below.                                                                                                                                                                                                                                |
+| No regression                               | Met         | `npm run -s check`: 33 files, 300 tests. `verify:llm` 10/10, `verify:chat` 19/19, `verify:todos` 19/19, with screenshots in the git-ignored `coverage/deploy-verify-a1/`.                                                                 |
+
+### Why `serve:prod` + `verify:prod` is blocked
+
+`npm run serve:prod -- --port 8888` (= `netlify serve --offline`) needs no login or linked site. It builds with `netlify.toml` and serves `dist/` plus the Functions. Two things stopped the run on the mock:
+
+1. **It uses the engine in `.env`, not the mock.** The CLI logs `Injected .env file env vars: INFERENCE_ENGINE, ANTHROPIC_API_KEY, …`. In this session the engine there is `anthropic` with a real key. The headless permissions deny an inline override (`INFERENCE_ENGINE=mock npm run …`), so `verify:prod` would have spent real Claude requests. It wasn't run.
+2. **It doesn't listen on `127.0.0.1`.** `verify:prod -- http://127.0.0.1:8888` got `fetch failed` on every check while the server was up (it held its port 3999). It most likely binds `localhost` → `::1` only, which is the reverse of CLAUDE.md's Ollama note. The agent couldn't confirm this, because `curl` and process tools need approval.
+
+For the PO, in PowerShell:
+
+```powershell
+$env:INFERENCE_ENGINE = 'mock'
+npm run serve:prod -- --port 8888
+# second terminal:
+npm run verify:prod -- http://localhost:8888
+```
+
+Expected: every check passes with `"engine": "mock"`. If the CLI's `.env` injection overrides the shell variable, set `INFERENCE_ENGINE=mock` in `.env` for the run.
+
 ## Findings for the PO
+
+0. **Second pass: the real Anthropic key was written to a local log.** A diagnostic `netlify serve --debug` sets `DEBUG=*`, and Vite's debug logger printed the resolved environment, key included, into the agent's background-task output file in the user temp folder (`AppData/Local/Temp/claude/…/tasks/bnjyn7vat.output`). It's outside the repository. Nothing was committed and nothing was sent anywhere. Delete that file and consider rotating the key. Never run `serve:prod` with `--debug` when `.env` holds a real key.
+
+First-pass findings 1, 2 and 4 are resolved by Amendment 1. Finding 3 was re-deferred by the PO.
 
 1. **`/api/engine` counts against the rate limit.** The contract puts both routes in one Function (Decision 1), and Netlify applies a Function's `rateLimit` to all of its paths. Each page load spends 1 of the 6 requests per 3 minutes, so a visitor who reloads gets fewer chat turns. When it's limited, `fetchEngineInfo` returns `null` (engine unknown) and the chat still works. Splitting the routes into two Functions would fix it, but that changes Decision 1.
 2. **The rate-limit message says "Wait a few seconds".** The platform window is up to 3 minutes. That copy is a product decision, so it wasn't changed.
