@@ -24,6 +24,7 @@
     "verify:cold-ollama": "node scripts/verify-cold-ollama.mjs",
     "verify:persistence": "node scripts/verify-persistence.mjs",
     "verify:todos": "node scripts/verify-todos.mjs",
+    "verify:knowledge": "node scripts/verify-knowledge.mjs",
     "verify:prod": "node scripts/verify-prod.mjs",
     "serve:prod": "node scripts/serve-prod.mjs",
     "verify:prod:local": "node scripts/verify-prod-local.mjs",

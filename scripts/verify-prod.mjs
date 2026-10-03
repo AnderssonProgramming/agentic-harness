@@ -37,8 +37,17 @@ async function get(url) {
   };
 }
 
-/** Sends one chat request and reads the NDJSON stream to its end, timing it. */
-async function chat(content) {
+/**
+ * Sends one chat request and reads the NDJSON stream to its end, timing it. The reply text is
+ * returned beside the outcome, not in it, so the printed report stays short.
+ */
+async function chatWithText(content) {
+  let text = '';
+  const outcome = await chat(content, (delta) => (text += delta));
+  return { outcome, text };
+}
+
+async function chat(content, onDelta = () => {}) {
   const started = performance.now();
   const elapsed = () => Math.round(performance.now() - started);
   const outcome = { status: null, events: 0, chars: 0, last: null, elapsedMs: 0, cut: false };
@@ -65,7 +74,10 @@ async function chat(content) {
       outcome.last =
         event.type === 'error' ? { type: 'error', code: event.error.code } : { type: event.type };
       if (event.type === 'start') outcome.engine = `${event.engine}/${event.model}`;
-      if (event.type === 'delta') outcome.chars += event.text.length;
+      if (event.type === 'delta') {
+        outcome.chars += event.text.length;
+        onDelta(event.text);
+      }
     };
     for await (const chunk of response.body) {
       buffer += decoder.decode(chunk, { stream: true });
@@ -214,7 +226,20 @@ check(
   },
 );
 
-// --- 6. Optional: the 7th API request within 3 minutes is refused --------------------------------
+// --- 6. The answer comes from knowledge/ (B-06) -----------------------------------------------------
+// Only the PO's branch-naming.md contains these strings. On the mock (verify:prod:local), it
+// echoes the document a question names, which proves knowledge/ reached the deployed Function.
+const KNOWLEDGE_NEEDLES = ['<type>/<item-id>-<short-slug>', 'feat/b-06'];
+const branch = await chatWithText('What is our branch naming convention?');
+const branchFound = KNOWLEDGE_NEEDLES.filter((needle) => branch.text.includes(needle));
+check(
+  'knowledge-branch-naming',
+  'The branch naming answer comes from knowledge/ (B-06)',
+  branch.outcome.last?.type === 'done' && branchFound.length > 0,
+  { ...branch.outcome, found: branchFound, needles: KNOWLEDGE_NEEDLES },
+);
+
+// --- 7. Optional: the 7th API request within 3 minutes is refused --------------------------------
 if (rateLimit) {
   while (apiCalls.length < 7 && !apiCalls.some((call) => call.status === 429)) {
     await chat('Reply with the single word OK.');

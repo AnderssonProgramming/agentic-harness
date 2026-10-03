@@ -55,6 +55,17 @@ describe('the Netlify Function entry points (ADR-13)', () => {
     expect(text).toContain('Where do I start?');
   });
 
+  it('sends knowledge/ to the engine from the production entry point (B-06): the mock echoes it', async () => {
+    const ask = async (content: string) =>
+      (await events(chat(chatRequest({ messages: [{ role: 'user', content }] }))))
+        .map((event) => (event.type === 'delta' ? event.text : ''))
+        .join('');
+    const answer = await ask('What is our branch naming convention?');
+    expect(answer).toContain('From branch-naming.md:');
+    expect(answer).toContain('<type>/<item-id>-<short-slug>');
+    expect(await ask('Where do I start?')).not.toContain('From ');
+  });
+
   it('answers bad_request for a user message over the limit, before any engine starts (F-01)', async () => {
     const stream = await events(
       chat(

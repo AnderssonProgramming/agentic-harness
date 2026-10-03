@@ -15,6 +15,28 @@ export function mockIntent(message: string): TodoAction[] {
   return todoPhraseActions(message.replace(/\s*\[mock:[a-z_]+\]/g, ''));
 }
 
+/**
+ * The mock's stand-in for answering from the team's documents (B-06): the content of every
+ * `<document>` in the system prompt whose file name's words all appear in the message, e.g.
+ * branch-naming.md for "What is our branch naming convention?". Proves the documents arrive.
+ */
+export function mockKnowledgeAnswer(system: string, message: string): string {
+  const asked = message.toLowerCase();
+  const found: string[] = [];
+  for (const [, source, content] of system.matchAll(
+    /<document source="([^"]+)">\n([\s\S]*?)<\/document>/g,
+  )) {
+    const words = source
+      .replace(/\.md$/, '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    if (words.length > 0 && words.every((word) => asked.includes(word)))
+      found.push(`From ${source}: ${content.replace(/\s+/g, ' ').trim()}`);
+  }
+  return found.join(' ');
+}
+
 interface MockOptions {
   /** Pause between words, in ms. */
   delayMs: number;
@@ -52,7 +74,7 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
     name: 'mock',
     model: 'echo',
     actions: tools,
-    async *stream({ messages, signal }) {
+    async *stream({ system, messages, signal }) {
       const last = messages.at(-1)?.content ?? '';
       // Only the newest message counts: after a failed reply, the server merges the next message
       // into the unanswered one with a blank line, and old markers must not fire again.
@@ -82,7 +104,8 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
         return;
       }
       const userTurns = messages.filter((turn) => turn.role === 'user').length;
-      const reply = `You said: "${last.replace(/\s+/g, ' ').trim()}". This is the mock engine, so no model was called. I have received ${String(userTurns)} of your messages in this conversation.`;
+      const knowledge = mockKnowledgeAnswer(system, newest);
+      const reply = `You said: "${last.replace(/\s+/g, ' ').trim()}". This is the mock engine, so no model was called. I have received ${String(userTurns)} of your messages in this conversation.${knowledge === '' ? '' : ` ${knowledge}`}`;
       for (const word of reply.split(/(?<= )/)) {
         await wait();
         yield word;
