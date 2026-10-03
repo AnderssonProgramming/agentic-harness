@@ -25,3 +25,7 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local Netlify state, written by `netlify serve` (and the deno.lock its tooling regenerates)
+.netlify
+deno.lock
