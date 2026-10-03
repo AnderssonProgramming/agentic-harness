@@ -6,7 +6,7 @@ import { LLM_CONFIG } from '../config.ts';
 import { selectEngine } from '../engine.ts';
 import { IDLE_TIMEOUT } from '../errors.ts';
 import { anthropicEngine } from './anthropic.ts';
-import { mockEngine, mockIntent } from './mock.ts';
+import { MOCK_INVENTED_SOURCE, mockEngine, mockIntent, mockSourcesLine } from './mock.ts';
 import { ollamaEngine } from './ollama.ts';
 import type { Engine, EngineChunk, FetchLike, TokenUsage } from './types.ts';
 
@@ -394,6 +394,37 @@ describe('mockEngine', () => {
       }),
     );
     expect(chunks).toEqual([{ kind: 'add', text: 'ask Ana how deploys work' }, NO_USAGE]);
+  });
+
+  it('ends a knowledge answer with a Sources line naming only the matched documents (B-07)', async () => {
+    const system =
+      'Prompt\n\n<document source="branch-naming.md">\nUse feat/x.\n</document>\n\n<document source="deploys.md">\nFriday.\n</document>';
+    const reply = async (content: string) =>
+      (
+        await all(
+          mockEngine({ delayMs: 0 }).stream({
+            ...input(),
+            system,
+            messages: [{ role: 'user', content }],
+          }),
+        )
+      )
+        .filter((chunk) => typeof chunk === 'string')
+        .join('');
+    expect((await reply('What is our branch naming convention?')).split('\n').at(-1)).toBe(
+      'Sources: branch-naming.md',
+    );
+    expect(await reply('Where do I start?')).not.toContain('Sources:');
+    expect((await reply('Branch naming? [mock:unknown_source]')).split('\n').at(-1)).toBe(
+      `Sources: branch-naming.md, ${MOCK_INVENTED_SOURCE}`,
+    );
+  });
+});
+
+describe('mockSourcesLine (B-07)', () => {
+  it('cites a document only when it is in the system prompt', () => {
+    expect(mockSourcesLine('', 'What is our branch naming convention?')).toBe('');
+    expect(mockSourcesLine('', 'x [mock:unknown_source]')).toBe(`Sources: ${MOCK_INVENTED_SOURCE}`);
   });
 });
 

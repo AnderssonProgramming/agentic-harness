@@ -20,9 +20,9 @@ export function mockIntent(message: string): TodoAction[] {
  * `<document>` in the system prompt whose file name's words all appear in the message, e.g.
  * branch-naming.md for "What is our branch naming convention?". Proves the documents arrive.
  */
-export function mockKnowledgeAnswer(system: string, message: string): string {
+function matchedDocuments(system: string, message: string): { source: string; content: string }[] {
   const asked = message.toLowerCase();
-  const found: string[] = [];
+  const found: { source: string; content: string }[] = [];
   for (const [, source, content] of system.matchAll(
     /<document source="([^"]+)">\n([\s\S]*?)<\/document>/g,
   )) {
@@ -32,9 +32,29 @@ export function mockKnowledgeAnswer(system: string, message: string): string {
       .split(/[^a-z0-9]+/)
       .filter(Boolean);
     if (words.length > 0 && words.every((word) => asked.includes(word)))
-      found.push(`From ${source}: ${content.replace(/\s+/g, ' ').trim()}`);
+      found.push({ source, content });
   }
-  return found.join(' ');
+  return found;
+}
+
+export function mockKnowledgeAnswer(system: string, message: string): string {
+  return matchedDocuments(system, message)
+    .map(({ source, content }) => `From ${source}: ${content.replace(/\s+/g, ' ').trim()}`)
+    .join(' ');
+}
+
+/** A document name no knowledge/ folder has, cited for `[mock:unknown_source]` (B-07). */
+export const MOCK_INVENTED_SOURCE = 'invented-guide.md';
+
+/**
+ * The mock's stand-in for citing (B-07): the `Sources:` line a model is asked to end with, naming
+ * the documents it answered from. `[mock:unknown_source]` adds a name that isn't loaded, so the
+ * browser's "not a known document" path can be checked. Empty when nothing is cited.
+ */
+export function mockSourcesLine(system: string, message: string): string {
+  const sources = matchedDocuments(system, message).map(({ source }) => source);
+  if (message.includes('[mock:unknown_source]')) sources.push(MOCK_INVENTED_SOURCE);
+  return sources.length === 0 ? '' : `Sources: ${sources.join(', ')}`;
 }
 
 interface MockOptions {
@@ -66,7 +86,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * Deterministic engine for tests and offline demos; no model is called. It echoes the last
  * message and counts the user turns it received, which proves the history arrives.
  * Test hooks in the user's message: "[mock:<error code>]" fails with that code, "[mock:slow]"
- * streams ten times slower. The to-do phrases of `mockIntent` yield actions instead of text,
+ * streams ten times slower, "[mock:unknown_source]" cites a document that isn't loaded. The to-do phrases of `mockIntent` yield actions instead of text,
  * unless `tools` is off.
  */
 export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
@@ -80,7 +100,7 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
       // into the unanswered one with a blank line, and old markers must not fire again.
       const newest = last.split('\n\n').at(-1) ?? '';
       const injected = /\[mock:([a-z_]+)\]/.exec(newest)?.[1];
-      if (injected && injected !== 'slow') {
+      if (injected && injected !== 'slow' && injected !== 'unknown_source') {
         if (!isChatErrorCode(injected))
           throw chatError('bad_request', `Unknown mock error: ${injected}`, 'mock');
         throw chatError(injected, `Simulated ${injected} error`, 'mock');
@@ -105,7 +125,8 @@ export function mockEngine({ delayMs, tools = true }: MockOptions): Engine {
       }
       const userTurns = messages.filter((turn) => turn.role === 'user').length;
       const knowledge = mockKnowledgeAnswer(system, newest);
-      const reply = `You said: "${last.replace(/\s+/g, ' ').trim()}". This is the mock engine, so no model was called. I have received ${String(userTurns)} of your messages in this conversation.${knowledge === '' ? '' : ` ${knowledge}`}`;
+      const sources = mockSourcesLine(system, newest);
+      const reply = `You said: "${last.replace(/\s+/g, ' ').trim()}". This is the mock engine, so no model was called. I have received ${String(userTurns)} of your messages in this conversation.${knowledge === '' ? '' : ` ${knowledge}`}${sources === '' ? '' : `\n${sources}`}`;
       for (const word of reply.split(/(?<= )/)) {
         await wait();
         yield word;
