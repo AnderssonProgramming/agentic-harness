@@ -45,3 +45,10 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Risk:** Low (harness)
 - **Where:** `scripts/audit-facts.mjs`. The secret scan counts the fake keys that every report quotes (10 → 12 hits). The auditor's judgment is unchanged ("fake fixtures"), but the number grows with every run.
 - **When to fix:** in the next audit cycle. Exclude `docs/audit/` and `AUDIT-REPORT.md` from `secrets.tracked`, but still scan them in `secrets.history` for real keys.
+
+## [D-07] The deploy tool's dependency tree has 16 high-severity advisories (DEP-02, accepted by the PO)
+
+- **Risk:** reclassified by the PO from High to **Low**, for this cause only.
+- **Where:** `netlify-cli` (devDependency, added 2026-10-02 for week 8). All 16 advisories are inside its own subtree: `braces`/`micromatch` regex DoS (via `fast-glob`, `zip-it-and-ship-it`, `http-proxy-middleware`), `node-forge` signature verification (via `listhen` → `ipx`), and `sharp`/libvips CVEs (via `@netlify/images`). npm's only suggested fix is `netlify-cli@2.13.1`, a 2019 major downgrade, so not a real fix.
+- **Why it's accepted:** it's a **local deployment tool**. None of it ships. The browser bundle and the deployed Function are built from our code only, and every release checks that the deployed assets contain no deploy-tool code or keys. The DoS paths need attacker-controlled glob or regex input to a command we run ourselves. Keeping it in `package.json` keeps it **visible to the audit**. The alternative, `npx` per run, runs the same code while hiding it.
+- **When to revisit:** at every release (the release skill re-reads `npm audit`). Fix immediately if an advisory reaches a **runtime** dependency (`dependencies`, or anything imported by `src/` or `server/`), or if a `netlify-cli` release clears them.
