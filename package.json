@@ -23,6 +23,9 @@
     "verify:llm": "node scripts/verify-llm.mjs",
     "verify:persistence": "node scripts/verify-persistence.mjs",
     "verify:todos": "node scripts/verify-todos.mjs",
+    "verify:prod": "node scripts/verify-prod.mjs",
+    "deploy:preview": "netlify deploy --build",
+    "deploy:prod": "netlify deploy --build --prod",
     "context:profile": "node scripts/context-profile.mjs",
     "audit:facts": "node scripts/audit-facts.mjs",
     "audit:validate": "node scripts/audit-validate.mjs"
