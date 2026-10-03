@@ -137,6 +137,19 @@ export function isEngineInfo(value: unknown): value is EngineInfo {
   );
 }
 
+/**
+ * One of the team's documents the model was given, from `GET /api/knowledge` (B-07, ADR-14).
+ * `source` is the file name the model cites; `GET /api/knowledge/<source>` returns its text.
+ */
+export interface KnowledgeDoc {
+  source: string;
+  title: string;
+}
+
+export function isKnowledgeDoc(value: unknown): value is KnowledgeDoc {
+  return isRecord(value) && nonEmpty(value.source) && typeof value.title === 'string';
+}
+
 export function isStreamEvent(value: unknown): value is StreamEvent {
   if (!isRecord(value)) return false;
   switch (value.type) {

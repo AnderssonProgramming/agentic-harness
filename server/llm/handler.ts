@@ -3,6 +3,7 @@ import { chatError } from '../../src/shared/llm/errors.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import { engineInfo, NDJSON_CONTENT_TYPE, runChat, type ChatCoreOptions } from './chat-core.ts';
 import { LLM_CONFIG } from './config.ts';
+import { knowledgeRoute } from './knowledge-route.ts';
 
 /**
  * An oversized body is rejected at once, but the rest of its upload is still on the connection:
@@ -57,6 +58,27 @@ export function createEngineInfoHandler(options: Pick<ChatCoreOptions, 'env' | '
     res.setHeader('cache-control', 'no-store');
     res.statusCode = result.status;
     res.end(JSON.stringify(result.body));
+  };
+}
+
+/**
+ * GET the loaded documents or one document's text (B-07; Node adapter over knowledgeRoute).
+ * Mounted at the route, so `req.url` is what follows it (Connect strips the mount path).
+ */
+export function createKnowledgeHandler(
+  options: Pick<ChatCoreOptions, 'env' | 'engineFor' | 'knowledge'>,
+) {
+  return function handleKnowledge(req: IncomingMessage, res: ServerResponse): void {
+    const subpath = (req.url ?? '').split('?')[0] ?? '';
+    const result = knowledgeRoute(options, req.method ?? 'GET', subpath);
+    res.statusCode = result.status;
+    res.setHeader('cache-control', 'no-store');
+    if (result.contentType) {
+      res.setHeader('content-type', result.contentType);
+      res.setHeader('x-content-type-options', 'nosniff');
+    }
+    if (result.allow) res.setHeader('allow', result.allow);
+    res.end(result.body ?? undefined);
   };
 }
 

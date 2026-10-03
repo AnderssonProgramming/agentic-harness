@@ -27,6 +27,8 @@ export const LLM_CONFIG = {
   route: '/api/chat',
   /** GET: the active engine and whether it can run to-do actions (ADR-11). */
   engineRoute: '/api/engine',
+  /** GET: the documents the active engine was given; `/<source>` returns one's text (B-07). */
+  knowledgeRoute: '/api/knowledge',
   defaultEngine: 'anthropic',
   anthropicModel: 'claude-sonnet-5',
   ollamaModel: 'phi3',

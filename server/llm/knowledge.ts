@@ -24,11 +24,23 @@ export interface SkippedFile {
   reason: string;
 }
 
+/** A document that passed the size and secrets guards, as the browser may read it (B-07). */
+export interface KnowledgeDocument {
+  source: string;
+  title: string;
+  content: string;
+}
+
 export interface KnowledgeBase {
   /** What each engine gets appended to its system prompt: whole documents only, within its budget. */
   text: Readonly<Record<EngineName, string>>;
   /** The documents each engine gets, in the order sent. */
   included: Readonly<Record<EngineName, readonly string[]>>;
+  /**
+   * Every document that passed the guards, by file name. A Map, so a requested name like
+   * `constructor` can't reach an inherited property; `/api/knowledge` serves only these (B-07).
+   */
+  documents: ReadonlyMap<string, KnowledgeDocument>;
   /** Every file not sent to at least one engine, with why. */
   skipped: readonly SkippedFile[];
   /** The server-console warning naming every skipped file, or null when nothing was skipped. */
@@ -38,9 +50,15 @@ export interface KnowledgeBase {
 export const EMPTY_KNOWLEDGE: KnowledgeBase = {
   text: { anthropic: '', ollama: '', mock: '' },
   included: { anthropic: [], ollama: [], mock: [] },
+  documents: new Map(),
   skipped: [],
   warning: null,
 };
+
+/** The document's first `# ` heading, or its file name when it has none. */
+export function documentTitle(source: string, content: string): string {
+  return /^#[ \t]+(.+?)[ \t#]*$/m.exec(content)?.[1] ?? source;
+}
 
 /**
  * Most characters the server adds to a request for this engine (LLM-05, per engine since B-06):
@@ -89,13 +107,21 @@ export function buildKnowledge(
   const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const skipped: SkippedFile[] = [];
   const sendable: { name: string; block: string }[] = [];
+  const documents = new Map<string, KnowledgeDocument>();
   for (const file of sorted) {
     if (file.bytes > maxFileBytes)
       skipped.push({ name: file.name, reason: `over ${String(maxFileBytes)} bytes` });
     else if (file.content === null) skipped.push({ name: file.name, reason: 'unreadable' });
     else if (containsSecret(file.content))
       skipped.push({ name: file.name, reason: 'contains a key pattern; never sent' });
-    else sendable.push({ name: file.name, block: documentBlock(file.name, file.content) });
+    else {
+      sendable.push({ name: file.name, block: documentBlock(file.name, file.content) });
+      documents.set(file.name, {
+        source: file.name,
+        title: documentTitle(file.name, file.content),
+        content: file.content,
+      });
+    }
   }
 
   const text = { anthropic: '', ollama: '', mock: '' };
@@ -124,7 +150,7 @@ export function buildKnowledge(
     skipped.length === 0
       ? null
       : `[knowledge] Skipped ${String(skipped.length)} file(s): ${skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}`;
-  return { text, included, skipped, warning };
+  return { text, included, documents, skipped, warning };
 }
 
 /**

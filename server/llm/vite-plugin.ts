@@ -1,7 +1,7 @@
 import { loadEnv, type Connect, type Plugin } from 'vite';
 import { LLM_CONFIG } from './config.ts';
 import type { Env } from './engine.ts';
-import { createChatHandler, createEngineInfoHandler } from './handler.ts';
+import { createChatHandler, createEngineInfoHandler, createKnowledgeHandler } from './handler.ts';
 import { knowledgeDirCandidates, loadKnowledge } from './knowledge.ts';
 
 /**
@@ -17,6 +17,10 @@ export function llmApi(): Plugin {
     const knowledge = loadKnowledge(knowledgeDirCandidates(root, undefined));
     const handleChat = createChatHandler({ env: () => env, knowledge });
     const handleEngineInfo = createEngineInfoHandler({ env: () => env });
+    const handleKnowledge = createKnowledgeHandler({ env: () => env, knowledge });
+    middlewares.use(LLM_CONFIG.knowledgeRoute, (req, res) => {
+      handleKnowledge(req, res);
+    });
     middlewares.use(LLM_CONFIG.route, (req, res, next) => {
       handleChat(req, res).catch(next);
     });

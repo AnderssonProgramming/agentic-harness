@@ -41,6 +41,19 @@ Delegated to: the `feature-builder` subagent, in one bounded session. This contr
 - Size: if this grows past about 6 steps, finish the current step, commit, and hand off.
 - One commit per step. Record the design as **ADR-14** (status "Proposed by the agent, pending PO review") with a Decision-index row; set B-07 to `done` with the evidence file.
 
+## Plan
+
+Written by the `feature-builder` subagent (2026-10-03).
+
+| #   | Step                                                                                                                                                                                                         | Files                                                                                                                                                    | Criteria |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1   | Server: `GET /api/knowledge` and `/api/knowledge/<source>`, transport-free core over the loaded documents (a `Map`, never the filesystem), both adapters, the engine Function's paths and its knowledge load | `server/llm/knowledge.ts`, `knowledge-route.ts` (+ test), `web-handler.ts`, `handler.ts`, `vite-plugin.ts`, `netlify/functions/engine.ts`, Function test | 2, 4     |
+| 2   | Prompt asks for the `Sources:` line or an explicit "not covered"; the mock appends `Sources:` for the documents it matched, and an invented one for `[mock:unknown_source]`                                  | `server/llm/system-prompt.ts`, `engines/mock.ts`, engine tests                                                                                           | 1, 2, 3  |
+| 3   | Browser model and data: the `KnowledgeDoc` wire type, the `Sources:` parser and classifier, `api/knowledge-api.ts`, `useKnowledge` hook                                                                      | `src/shared/llm/protocol.ts`, `src/features/chat/model/citations.ts` (+ test), `api/knowledge-api.ts`, `hooks/use-knowledge.ts` (+ test)                 | 1, 3     |
+| 4   | UI: source chips in `ReplyBody`, the presentational `SourcePanel`, wiring in `ChatScreen`, CSS (narrow screens, reduced motion)                                                                              | `components/source-chips.tsx`, `source-panel.tsx` (+ tests), `reply-body.tsx`, `message-list.tsx`, `chat-screen.tsx`, `chat.css`                         | 1, 2, 3  |
+| 5   | `verify:chat` step on the mock: chip → panel with the file's text → Escape returns focus; the unknown name isn't clickable                                                                                   | `scripts/verify-chat.mjs`                                                                                                                                | 2, 3     |
+| 6   | Live Anthropic run (2 requests) through the same parser and route, evidence, ADR-14, B-07 `done`                                                                                                             | `scripts/verify-citations.mjs`, `package.json` script, `docs/evidence/b-07-verification.md`, `ARCHITECTURE.md`, `BACKLOG.md`                             | 1, 3, 5  |
+
 ## How you deliver
 
 Commits with hashes; each criterion with its evidence; **"Decisions I made that this contract didn't cover"**; the final `check` result.

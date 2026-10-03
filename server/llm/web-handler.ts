@@ -2,6 +2,7 @@ import { chatError } from '../../src/shared/llm/errors.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import { engineInfo, NDJSON_CONTENT_TYPE, runChat, type ChatCoreOptions } from './chat-core.ts';
 import { LLM_CONFIG } from './config.ts';
+import { knowledgeRoute } from './knowledge-route.ts';
 
 /**
  * Reads at most maxBytes of the body, then parses it as JSON. Stops reading as soon as the limit
@@ -82,15 +83,32 @@ function engineResponse(request: Request, options: ChatCoreOptions): Response {
   });
 }
 
+function knowledgeResponse(request: Request, options: ChatCoreOptions, subpath: string): Response {
+  const result = knowledgeRoute(options, request.method, subpath);
+  const headers: Record<string, string> = { 'cache-control': 'no-store' };
+  if (result.contentType) {
+    headers['content-type'] = result.contentType;
+    headers['x-content-type-options'] = 'nosniff';
+  }
+  if (result.allow) headers.allow = result.allow;
+  return new Response(result.body, { status: result.status, headers });
+}
+
 /**
  * The Web `Request` → `Response` adapter over the chat core (ADR-13), for runtimes like Netlify
- * Functions: `/api/chat` streams NDJSON, `/api/engine` answers EngineInfo, anything else is 404.
+ * Functions: `/api/chat` streams NDJSON, `/api/engine` answers EngineInfo, `/api/knowledge[/…]`
+ * serves the loaded documents (B-07), anything else is 404.
  */
 export function createWebApiHandler(options: ChatCoreOptions) {
   return function handleApi(request: Request): Response {
     const { pathname } = new URL(request.url);
     if (pathname === LLM_CONFIG.route) return chatResponse(request, options);
     if (pathname === LLM_CONFIG.engineRoute) return engineResponse(request, options);
+    if (
+      pathname === LLM_CONFIG.knowledgeRoute ||
+      pathname.startsWith(`${LLM_CONFIG.knowledgeRoute}/`)
+    )
+      return knowledgeResponse(request, options, pathname.slice(LLM_CONFIG.knowledgeRoute.length));
     return new Response(null, { status: 404 });
   };
 }

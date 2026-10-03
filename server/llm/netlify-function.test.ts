@@ -117,9 +117,24 @@ describe('the Netlify Function entry points (ADR-13)', () => {
       rateLimit: { windowLimit: 6, windowSize: 180, aggregateBy: ['ip', 'domain'] },
     });
     expect(engineConfig).toEqual({
-      path: LLM_CONFIG.engineRoute,
+      path: [LLM_CONFIG.engineRoute, LLM_CONFIG.knowledgeRoute, `${LLM_CONFIG.knowledgeRoute}/*`],
       rateLimit: { windowLimit: 60, windowSize: 180, aggregateBy: ['ip', 'domain'] },
     });
+  });
+
+  it('serves the loaded knowledge/ list and one document from the engine Function (B-07)', async () => {
+    const list = engine(new Request(`${SITE}${LLM_CONFIG.knowledgeRoute}`));
+    expect(list.status).toBe(200);
+    expect(await list.json()).toContainEqual({
+      source: 'branch-naming.md',
+      title: expect.any(String) as unknown,
+    });
+    const doc = engine(new Request(`${SITE}${LLM_CONFIG.knowledgeRoute}/branch-naming.md`));
+    expect(doc.status).toBe(200);
+    expect(doc.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(await doc.text()).toContain('<type>/<item-id>-<short-slug>');
+    for (const path of ['/..%2Fpackage.json', '/%2Fetc%2Fpasswd', '/missing.md', '/a/b.md'])
+      expect(engine(new Request(`${SITE}${LLM_CONFIG.knowledgeRoute}${path}`)).status).toBe(404);
   });
 });
 
