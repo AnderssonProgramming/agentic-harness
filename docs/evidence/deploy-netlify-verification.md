@@ -57,16 +57,54 @@ Expected: every check passes with `"engine": "mock"`.
 1. **It uses the engine in `.env`, not the mock.** The CLI logs `Injected .env file env vars: INFERENCE_ENGINE, ANTHROPIC_API_KEY, …`. In this session the engine there is `anthropic` with a real key. The headless permissions deny an inline override (`INFERENCE_ENGINE=mock npm run …`), so `verify:prod` would have spent real Claude requests. It wasn't run.
 2. **It doesn't listen on `127.0.0.1`.** `verify:prod -- http://127.0.0.1:8888` got `fetch failed` on every check while the server was up (it held its port 3999). It most likely binds `localhost` → `::1` only, which is the reverse of CLAUDE.md's Ollama note. The agent couldn't confirm this, because `curl` and process tools need approval.
 
-For the PO, in PowerShell:
+Superseded by Amendment 2 (below): run `npm run verify:prod:local`. Don't use the earlier two-terminal recipe: it served the Functions with the real `.env` key.
 
-```powershell
-$env:INFERENCE_ENGINE = 'mock'
-npm run serve:prod -- --port 8888
-# second terminal:
-npm run verify:prod -- http://localhost:8888
+## Amendment 2 (third pass, 2026-10-02)
+
+| Criterion                                                                                   | Status | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invariant: the served Functions never get a non-empty `ANTHROPIC_API_KEY`; engine is `mock` | Met    | `scripts/serve-prod-env.test.mjs` runs every combination of 9 parent environments × 12 argument lists (a real-looking key in the parent env under two casings, in the args, `DEBUG=*`, `NODE_DEBUG`, `--debug`, `--auth`, `--context`…). Each one is refused, or it gets an empty key, `INFERENCE_ENGINE=mock` and no debug variable. `verify:prod:local` reports `"engine": "mock"`, and the CLI lists `ANTHROPIC_API_KEY` under _ignored_ `.env` variables (defined in process), not under _injected_. |
+| `verify:prod:local` passes on the mock, and nothing listens on its ports afterwards         | Met    | Output below, at commit `8fd1eaf`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `serve:prod -- --debug` exits non-zero without starting                                     | Met    | `scripts/serve-prod-env.test.mjs`: it spawns `scripts/serve-prod.mjs --debug` and expects exit 2, `"--debug" is refused` on stderr and nothing on stdout. A second test does the same with `DEBUG=*` in the environment.                                                                                                                                                                                                                                                                                 |
+| No regression                                                                               | Met    | `npm run -s check`: 34 files, 311 tests. `verify:llm` 10/10. `verify:chat -- coverage/deploy-verify-a2` 19/19 (git-ignored folder, no tracked file changed).                                                                                                                                                                                                                                                                                                                                             |
+
+### `npm run -s verify:prod:local` (mock engine)
+
+Its own checks, verbatim:
+
+```json
+[
+  {
+    "id": "site-up",
+    "pass": true,
+    "detail": { "url": "http://localhost:59807/", "startupMs": 13254, "exitedBeforeUp": null }
+  },
+  { "id": "verify-prod", "pass": true, "detail": { "exitCode": 0 } },
+  { "id": "engine-mock", "pass": true, "detail": { "engine": "mock" } },
+  {
+    "id": "no-secret-injected",
+    "pass": true,
+    "detail": {
+      "injectedFromDotEnv": ["NODE_VERSION", "ANTHROPIC_MODEL", "OLLAMA_BASE_URL", "OLLAMA_MODEL"],
+      "ignoredFromDotEnv": ["INFERENCE_ENGINE", "ANTHROPIC_API_KEY"],
+      "injectedSecrets": []
+    }
+  },
+  {
+    "id": "ports-closed",
+    "pass": true,
+    "detail": {
+      "port": 59807,
+      "functionsPort": 59808,
+      "stillListening": { "port": false, "functionsPort": false }
+    }
+  }
+]
 ```
 
-Expected: every check passes with `"engine": "mock"`. If the CLI's `.env` injection overrides the shell variable, set `INFERENCE_ENGINE=mock` in `.env` for the run.
+The `verify:prod` report it ran: `app-html` ✓, `app-js` ✓ (1 file), `no-secrets` ✓ (2 files scanned, 3 needles, real key checked, no leaks), `api-engine` ✓ (`{"engine":"mock","model":"echo","actions":true}`), `chat-short` ✓ (34 events, `done`), `chat-full-length` ✓ (74 events, `done`, 2.5 s). Exit code 0.
+
+On the mock, `chat-full-length` only proves the stream reaches `done`: the echo reply is 414 characters. The platform's real stream limit can only be measured by `verify:prod` against a deployed URL with Claude.
 
 ## Findings for the PO
 
