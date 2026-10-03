@@ -58,6 +58,8 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 
 ## How the harness is organized
 
+**Final course deliverable:** [`deliverable/`](deliverable/) holds the video script, `ACCESO.md` and the index of the ten documents.
+
 **To reuse the harness in another project, read [`HARNESS.md`](HARNESS.md)**, the operating manual. It installs the portable kit in [`harness-kit/`](harness-kit/). Week 8 closing documents: [showcase](docs/showcase.md), [final retro](docs/final-retro.md), [certification evidence](docs/certification.md).
 
 | File                                                                             | Purpose                                                                                                                |

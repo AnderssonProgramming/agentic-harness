@@ -1,0 +1,21 @@
+# Final deliverable: what goes in the Drive folder
+
+**Folder name:** `<Your name> - Compass - Entregable final`
+**Sharing:** "Anyone with the link can view". Check it by opening the link in an incognito window.
+
+| Drive folder     | What goes in it                                                       | Source in this repo                                                |
+| ---------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `01_video/`      | The recording (≤ 5 min), or `video.txt` with an unlisted YouTube link | Script: [`01_video/GUION.md`](01_video/GUION.md)                   |
+| `02_acceso/`     | `ACCESO.md`                                                           | [`02_acceso/ACCESO.md`](02_acceso/ACCESO.md), upload as-is         |
+| `03_documentos/` | `README.md`, linking the 10 documents in the repository               | [`03_documentos/README.md`](03_documentos/README.md), upload as-is |
+
+## Before submitting
+
+| Check                                                             | Status                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The folder link opens in incognito and everything is visible      | ☐ **Yours**, after uploading                                                                                                                                                                                                                                                                                                                           |
+| The video is ≤ 5:00 and the screen is readable                    | ☐ **Yours**, after recording                                                                                                                                                                                                                                                                                                                           |
+| Someone else followed `ACCESO.md` and could use the product       | ☐ **Yours**: ask one person, on their phone or browser. I verified production on 2026-10-03: `verify:prod` passed 6/6, and a live to-do request returned a real action                                                                                                                                                                                 |
+| The 10 documents are present, or there's a note on what's missing | ✅ All 10 are linked in `03_documentos/README.md`, with an "incomplete" section                                                                                                                                                                                                                                                                        |
+| The repository is accessible, with visible history                | ✅ Public: https://github.com/AnderssonProgramming/agentic-harness                                                                                                                                                                                                                                                                                     |
+| No real key, token or credential in the repo, video or documents  | ✅ Repo and documents: the audit's secret scan covered tracked files and all of git history; every key-shaped string is a deliberate test fake. ☐ **Video: yours.** Watch it frame by frame if a terminal or settings page appears. The key exposed in a local log on 2026-10-02 never reached the repo; the PO reports rotating it before the release |
