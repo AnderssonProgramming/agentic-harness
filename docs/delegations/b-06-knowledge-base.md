@@ -45,3 +45,16 @@ Delegated to: the `feature-builder` subagent, in one bounded session. This contr
 ## How you deliver
 
 Commits with hashes; each criterion with its evidence; **"Decisions I made that this contract didn't cover"**; the final `check` result.
+
+## Amendment 1 (after the first pass stopped, approved on 2026-10-03)
+
+The first pass stopped before writing code, correctly. Decisions 1 and 4 contradicted each other: ADR-12's 40,000-character Anthropic budget can't fit under the existing `MAX_PROMPT_ADDITIONS` of 16,000, which a full to-do list nearly fills. Options B (shrink knowledge to ~1,600 characters) and C (drop documents per request, depending on the user's to-do count, without telling the user) were rejected: C is a silent drop, and B defeats B-06.
+
+**Decision A replaces Decision 4:**
+
+1. **The bound becomes per engine:** prompt additions ≤ `MAX_PROMPT_ADDITIONS` (16,000: to-dos, instructions, tool definitions; unchanged) **+ that engine's knowledge budget** (40,000 Anthropic; 8,000 Ollama and the mock). Put the per-engine knowledge budget in one place and derive the bound from it.
+2. **The knowledge is filled only up to its own budget,** by the loader, in alphabetical order (ADR-12). So the knowledge alone can never push a request over the bound, and the existing `bad_request` path stays reachable only by oversized to-dos or instructions, as today.
+3. **The property test proves the new invariant:** for any request shape and sequence, and any knowledge set (including oversized, many-file and key-containing sets), what reaches the model is ≤ the engine's bound, and every loaded document is either fully included or skipped and listed. None is truncated mid-file.
+4. Record in ADR-12's update that LLM-05's bound is now per engine, and why. The next audit re-checks LLM-05 against it.
+
+Everything else in the contract stands. Commit this amendment's plan as your first step.
