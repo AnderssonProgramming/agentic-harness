@@ -129,3 +129,29 @@ Written by the `feature-builder` subagent on 2026-10-02. One commit per step.
 | A3  | Split into two Functions (chat 6/180, engine 60/180), both over the Web adapter; test both rules and paths; update ADR-13    | `netlify/functions/chat.ts`, `netlify/functions/engine.ts`, `server/llm/netlify-function.test.ts` | Two Functions             |
 | A4  | The new rate-limit wording, and the tests and checks that assert it                                                          | `src/shared/llm/errors.ts`, `src/shared/llm/client.test.ts`                                       | Rate-limit text           |
 | A5  | `npm run serve:prod`; run it with `verify:prod` on the mock; run every regression check; record the evidence                 | `package.json`, `docs/evidence/deploy-netlify-verification.md`                                    | serve:prod, no regression |
+
+## Amendment 2 (after the second pass, approved by the PO on 2026-10-02)
+
+### Why
+
+Pass 2 ran `netlify serve --debug` with the real `.env` loaded. `DEBUG=*` made the tooling print the environment, real `ANTHROPIC_API_KEY` included, into a local log, and the server it started outlived the session with the key in its environment, listening on every interface. The key is being rotated. This amendment makes the local production run **structurally unable** to hold a real secret, and makes the local check one command that cleans up after itself.
+
+### Decisions (not up for discussion)
+
+1. `npm run serve:prod` becomes `node scripts/serve-prod.mjs`, a wrapper that starts `netlify serve --offline` with `INFERENCE_ENGINE=mock` and **every secret variable from `.env.example` set to an empty value in the child's environment**, so the CLI's `.env` injection can't override them. It refuses `--debug`, `DEBUG` and any `*_API_KEY` passed in, and exits non-zero without starting.
+2. New `npm run verify:prod:local`: in the foreground, it starts the wrapper on a free port, waits until the site answers, runs `verify:prod` against it, **always stops the server** (on success, failure or Ctrl+C), and exits with `verify:prod`'s code. Use `localhost` as the host, not `127.0.0.1`: the CLI binds IPv6.
+3. Never run any command with `--debug`, `DEBUG=*` or verbose environment dumps in this project. Never print, read or log `.env` values.
+4. `deploy:preview` and `deploy:prod` stay as they are.
+
+### Acceptance criteria
+
+- [ ] **Invariant:** whatever arguments or environment `serve:prod` is started with, the served Functions never receive a non-empty `ANTHROPIC_API_KEY`, and the engine is `mock`. Evidence: a unit test of the wrapper's child-environment builder over several inputs (real-looking key in the parent env, in the args, `DEBUG=*`, `--debug`), plus `verify:prod:local` reporting `"engine": "mock"`.
+- [ ] `npm run verify:prod:local` passes every check on the mock, and afterwards **no process listens on its port** (checked by the script itself before it exits). Evidence: its output in `docs/evidence/deploy-netlify-verification.md`.
+- [ ] `npm run serve:prod -- --debug` exits non-zero without starting. Evidence: the test.
+- [ ] No regression: `npm run -s check`, `verify:llm`, `verify:chat -- <tmp dir>`.
+
+### Limits
+
+- Don't touch `.env`. Don't print environment variables, even masked. Don't run anything in the background: `verify:prod:local` is the only way you start the server.
+- No new dependencies.
+- One commit per decision.
