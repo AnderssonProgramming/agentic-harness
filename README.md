@@ -4,7 +4,7 @@ A conversational onboarding assistant for junior developers: it answers question
 
 This repository is also an **AI harness**: the coding agent that builds Compass works under a written contract, and every item it delivers comes with a plan, tests and recorded evidence.
 
-> **Status (Sprint 4, week 7):** Compass talks to a real model, keeps the conversation across browser restarts, and manages an onboarding to-do list. Say "remind me to ask Ana how deploys work", "what's on my list?" or "mark the deploy one as done": the app performs it on stored data and shows a confirmation built from what was saved. On an engine without tool calling (Ollama), to-do requests get an honest refusal instead of a made-up confirmation. Both features were built by delegated agents from approved plans and contracts ([B-08](docs/evidence/b-08-verification.md), [B-11 delegation record](docs/evidence/b-11-delegation-record.md)). The harness now audits the product too. Its own audit skill went from **4 High findings to 0** across three validated runs, and every fix has independent evidence ([comparison](docs/audit/COMPARISON.md), [debt](TECH-DEBT.md)).
+> **Status (Sprint 4, week 8): live at [agentichs.netlify.app](https://agentichs.netlify.app)** ([v0.2.0](docs/releases/v0.2.0.md)). Compass talks to a real model, keeps the conversation across browser restarts, and manages an onboarding to-do list. Say "remind me to ask Ana how deploys work", "what's on my list?" or "mark the deploy one as done": the app performs it on stored data and shows a confirmation built from what was saved. It ships through the `release` skill, which publishes only a draft that passed `verify:prod`, after the PO says go. The audit shows **0 Critical and 0 High** ([comparison](docs/audit/COMPARISON.md), [debt](TECH-DEBT.md)). The harness itself is now portable: [`HARNESS.md`](HARNESS.md) and [`harness-kit/`](harness-kit/) installed it in an empty project, and a fresh agent built a working tool there ([portability test](docs/evidence/portability-test.md)).
 
 ![Compass answering on turn 5 from what it was told on turns 1 and 2](docs/evidence/b-03-live-conversation.png)
 
@@ -60,31 +60,38 @@ Restart `npm run dev` after changing `.env`. If the key is missing, the chat say
 
 **To reuse the harness in another project, read [`HARNESS.md`](HARNESS.md)**, the operating manual. It installs the portable kit in [`harness-kit/`](harness-kit/). Week 8 closing documents: [showcase](docs/showcase.md), [final retro](docs/final-retro.md), [certification evidence](docs/certification.md).
 
-| File                                                                             | Purpose                                                                                             |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [`CLAUDE.md`](CLAUDE.md)                                                         | Master context: the agent's role, rules and prohibitions                                            |
-| [`.claude/settings.json`](.claude/settings.json)                                 | Enforced context exclusions and permissions                                                         |
-| [`BACKLOG.md`](BACKLOG.md)                                                       | Prioritized product backlog with acceptance criteria                                                |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                             | Folder map, architecture decisions (ADR-01 to ADR-09), engine switch                                |
-| [`CONTEXT-ROUTINE.md`](CONTEXT-ROUTINE.md)                                       | How to run a long agent session without it losing the thread                                        |
-| [`CONTEXT-LOG.md`](CONTEXT-LOG.md)                                               | Measured sessions: what filled the context and where quality dropped                                |
-| [`TASKS.md`](TASKS.md)                                                           | Repeated tasks measured as Custom Skill candidates, with before/after                               |
-| [`.claude/skills/`](.claude/skills)                                              | Custom Skills (see below)                                                                           |
-| [`docs/plans/`](docs/plans)                                                      | Step-by-step plans approved by the Product Owner before any code                                    |
-| [`docs/evidence/`](docs/evidence)                                                | Verification results, screenshots and contract-test transcripts                                     |
-| [`docs/contract-tests.md`](docs/contract-tests.md)                               | Deliberate rule violations and how the agent stopped each one                                       |
-| [`docs/evidence/self-correction-loop.md`](docs/evidence/self-correction-loop.md) | A deliberate compile error and how the agent detected and fixed it                                  |
-| [`AUDIT-CRITERIA.md`](AUDIT-CRITERIA.md)                                         | The 25 audit checks, written before any audit ran                                                   |
-| [`AUDIT-REPORT.md`](AUDIT-REPORT.md)                                             | The latest audit report, generated by the `audit` skill ([history and comparison](docs/audit/))     |
-| [`TECH-DEBT.md`](TECH-DEBT.md)                                                   | What we decided not to fix yet, why, and when                                                       |
-| [`docs/delegations/`](docs/delegations)                                          | Delegation contracts handed to the `feature-builder` subagent ([`.claude/agents/`](.claude/agents)) |
-| [`docs/sprint-3-review.md`](docs/sprint-3-review.md)                             | Three-minute demo script for the Sprint 3 Review                                                    |
-| [`docs/sprint-3-retro.md`](docs/sprint-3-retro.md)                               | Sprint 3 retrospective: where the delegation boundary is                                            |
-| [`docs/sprint-2-review.md`](docs/sprint-2-review.md)                             | Three-minute demo script for the Sprint 2 Review                                                    |
-| [`docs/sprint-2-retro.md`](docs/sprint-2-retro.md)                               | Sprint 2 harness retrospective                                                                      |
-| [`docs/sprint-1-review.md`](docs/sprint-1-review.md)                             | Three-minute demo script for the Sprint Review                                                      |
-| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)                               | Harness retrospective and the rules it added                                                        |
-| [`docs/code-walkthrough.md`](docs/code-walkthrough.md)                           | Line-by-line explanation of the chat feature                                                        |
+| File                                                                             | Purpose                                                                                                                |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [`CLAUDE.md`](CLAUDE.md)                                                         | Master context: the agent's role, rules and prohibitions                                                               |
+| [`HARNESS.md`](HARNESS.md)                                                       | The operating manual: how to install the harness in a new project, its three layers, the routine, the learned rules    |
+| [`harness-kit/`](harness-kit/)                                                   | The portable kit: generic templates, the `netlify` profile, `install.mjs` and `doctor.mjs`                             |
+| [`harness.config.json`](harness.config.json)                                     | Settings for the audit and the release gate: secret names, audited code paths, accepted advisory sources               |
+| [`.claude/settings.json`](.claude/settings.json)                                 | Enforced context exclusions and permissions                                                                            |
+| [`BACKLOG.md`](BACKLOG.md)                                                       | Prioritized product backlog with acceptance criteria                                                                   |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                             | Folder map and architecture decisions (ADR-01 to ADR-13), behind a Decision index                                      |
+| [`CONTEXT-ROUTINE.md`](CONTEXT-ROUTINE.md)                                       | How to run a long agent session without it losing the thread                                                           |
+| [`CONTEXT-LOG.md`](CONTEXT-LOG.md)                                               | Measured sessions: what filled the context and where quality dropped                                                   |
+| [`TASKS.md`](TASKS.md)                                                           | Repeated tasks measured as Custom Skill candidates, with before/after                                                  |
+| [`.claude/skills/`](.claude/skills)                                              | Custom Skills (see below)                                                                                              |
+| [`docs/plans/`](docs/plans)                                                      | Step-by-step plans approved by the Product Owner before any code                                                       |
+| [`docs/evidence/`](docs/evidence)                                                | Verification results, screenshots and contract-test transcripts                                                        |
+| [`docs/contract-tests.md`](docs/contract-tests.md)                               | Deliberate rule violations and how the agent stopped each one                                                          |
+| [`docs/evidence/self-correction-loop.md`](docs/evidence/self-correction-loop.md) | A deliberate compile error and how the agent detected and fixed it                                                     |
+| [`AUDIT-CRITERIA.md`](AUDIT-CRITERIA.md)                                         | The 25 audit checks, written before any audit ran                                                                      |
+| [`AUDIT-REPORT.md`](AUDIT-REPORT.md)                                             | The latest audit report, generated by the `audit` skill ([history and comparison](docs/audit/))                        |
+| [`TECH-DEBT.md`](TECH-DEBT.md)                                                   | What we decided not to fix yet, why, and when                                                                          |
+| [`docs/delegations/`](docs/delegations)                                          | Delegation contracts handed to the `feature-builder` subagent ([`.claude/agents/`](.claude/agents))                    |
+| [`docs/releases/`](docs/releases)                                                | Release notes per version, and [`DEPLOYMENTS.md`](docs/releases/DEPLOYMENTS.md), the record of every production deploy |
+| [`docs/showcase.md`](docs/showcase.md)                                           | Five-minute showcase script for the end of the course                                                                  |
+| [`docs/final-retro.md`](docs/final-retro.md)                                     | Final retrospective: the three rules that saved the most time, what was discarded, the next 30 days                    |
+| [`docs/certification.md`](docs/certification.md)                                 | Every deliverable of the program, with the file that proves it                                                         |
+| [`docs/sprint-3-review.md`](docs/sprint-3-review.md)                             | Three-minute demo script for the Sprint 3 Review                                                                       |
+| [`docs/sprint-3-retro.md`](docs/sprint-3-retro.md)                               | Sprint 3 retrospective: where the delegation boundary is                                                               |
+| [`docs/sprint-2-review.md`](docs/sprint-2-review.md)                             | Three-minute demo script for the Sprint 2 Review                                                                       |
+| [`docs/sprint-2-retro.md`](docs/sprint-2-retro.md)                               | Sprint 2 harness retrospective                                                                                         |
+| [`docs/sprint-1-review.md`](docs/sprint-1-review.md)                             | Three-minute demo script for the Sprint Review                                                                         |
+| [`docs/sprint-1-retro.md`](docs/sprint-1-retro.md)                               | Harness retrospective and the rules it added                                                                           |
+| [`docs/code-walkthrough.md`](docs/code-walkthrough.md)                           | Line-by-line explanation of the chat feature                                                                           |
 
 ## Custom Skills
 
@@ -124,12 +131,31 @@ Details, including how to point the coding agent itself at Ollama, are in [ARCHI
 
 Production is the static app from `dist/` plus two Netlify Functions in `netlify/functions/`: `chat.ts` serves `/api/chat` and `engine.ts` serves `/api/engine`. Both are thin adapters over the same chat core that `npm run dev` uses (ADR-13). The build command, publish directory, functions directory and Node version are all in `netlify.toml`, so the Netlify UI needs no build settings.
 
+**One-time setup (the PO):**
+
 1. `npx netlify login`
 2. `npx netlify init` (create a new site) or `npx netlify link` (an existing one). Accept the settings it reads from `netlify.toml`.
-3. In the Netlify UI, under Site configuration > Environment variables, set `ANTHROPIC_API_KEY` (mark it as secret). `INFERENCE_ENGINE` and `ANTHROPIC_MODEL` are optional; see `.env.example`.
-4. In the Anthropic console, set a monthly spend limit. It's the only global cap.
-5. `npm run deploy:preview`, then `npm run verify:prod -- <draft URL>`.
-6. `npm run deploy:prod` once the preview passes.
+3. In the Netlify UI, under Site configuration > Environment variables, set `ANTHROPIC_API_KEY`:
+   - mark it as secret, with the **Functions** scope;
+   - set it for **Production, Deploy Previews and Branch deploys**. Drafts are not production, and they need the key to be verified;
+   - never set it for Local development, which isn't secret.
+
+   `INFERENCE_ENGINE` and `ANTHROPIC_MODEL` are optional; see `.env.example`.
+
+4. Under Site configuration > Access & security > Visitor access, turn off protection for **non-production deploys**. Otherwise every draft answers 401, and `verify:prod` can't check it.
+5. In the Anthropic console, set a monthly spend limit. It's the only global cap.
+
+**Every release:** run `/release` (or `/release patch`) in Claude Code. The skill runs these steps:
+
+1. the gate, `npm run release:gate`;
+2. a version bump and notes;
+3. a draft deploy, checked with `verify:prod`;
+4. it asks you before publishing;
+5. it publishes exactly that draft;
+6. it checks production, and rolls back if production fails;
+7. it records the deploy in [`DEPLOYMENTS.md`](docs/releases/DEPLOYMENTS.md) and tags the version.
+
+`npm run deploy:preview` and `npm run deploy:prod` remain for emergencies only: they skip the gate and the record.
 
 To check the production build locally, run `npm run verify:prod:local`. In one foreground command it builds the app, serves it with the Functions (`netlify serve --offline`), runs `verify:prod` against `http://localhost:<port>`, stops the server and confirms its ports are closed. `npm run serve:prod [-- --port <n>]` starts the same server by hand, until you press Ctrl+C.
 
