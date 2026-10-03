@@ -139,7 +139,7 @@ Acceptance criteria:
 - Clicking a suggestion sends it as a message.
 - Suggestions disappear once the conversation has at least one message.
 
-Status: pending
+Status: done (2026-10-03, delegated; evidence: `docs/evidence/b-10-verification.md`)
 
 ### [B-11] Onboarding to-do list the assistant manages
 
