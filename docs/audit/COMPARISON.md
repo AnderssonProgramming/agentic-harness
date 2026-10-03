@@ -39,3 +39,18 @@ Five runs this week, each in a fresh session:
 ## What the second run proved
 
 The first round of fixes **passed every test the agent wrote**, and the second audit still found two bypasses. The reason was the PO's contract: it bounded individual _elements_ (per message, per to-do text), not the _invariant_ (what reaches the model, whatever the request's shape). Rewritten as invariants, the third round had to prove them with a property-style test over many request shapes, and that test found **P-01**, a High defect no audit criterion could see.
+
+## Pre-release run (`2a0eec9`, 2026-10-02)
+
+The run before the first release. The code changed since `63f993c`: the shared chat core with two adapters (ADR-13), two rate-limited Netlify Functions, `serve:prod` and the release scripts.
+
+| Risk     | Final (`63f993c`) | Pre-release (`2a0eec9`) |
+| -------- | ----------------- | ----------------------- |
+| Critical | 0                 | 0                       |
+| High     | 0                 | 0                       |
+| Medium   | 2                 | 2                       |
+| Low      | 0                 | 0                       |
+
+Same failed criteria, same risks: PER-01 (TECH-DEBT D-01) and PERF-01 (D-02). **Triage: no change.** Both stay deferred under their existing triggers. The auditor re-checked the input limits, history bound, prompt bound and cancel-on-disconnect in the core and in both adapters, and they still hold.
+
+One uncounted observation: the HTTP 429 → `rate_limit` path (`src/shared/llm/client.ts:96-99`) is covered by a unit test but by no verify script. It can only be exercised against the deployed site, because the limit is enforced by the platform.
