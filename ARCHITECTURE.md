@@ -37,7 +37,9 @@ New ADRs add a row here in the same commit.
 ├── .claude/skills/         # Custom Skills (one folder per skill, SKILL.md inside)
 ├── docs/                   # contract tests and other evidence
 ├── scripts/                # Node scripts run by npm (no build step)
-├── server/llm/             # server-only: chat endpoint, engines, keys (ADR-08, ADR-09)
+├── server/llm/             # server-only: chat endpoint, engines, keys (ADR-08, ADR-09, ADR-13)
+├── netlify/functions/      # production entry point only (ADR-13); its test is in server/llm/,
+│                           # because Netlify deploys every file here as a function
 ├── index.html              # Vite entry HTML
 └── src/
     ├── main.tsx            # mounts <App /> into #root, nothing else

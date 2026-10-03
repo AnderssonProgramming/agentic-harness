@@ -21,7 +21,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'vite.config.ts'],
+    files: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'netlify/**/*.ts', 'vite.config.ts'],
     extends: [...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       globals: globals.browser,
@@ -65,6 +65,19 @@ export default tseslint.config(
   {
     files: ['vite.config.ts'],
     rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    // Netlify Functions require a default export; classes stay forbidden.
+    files: ['netlify/functions/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ClassDeclaration',
+          message: 'Classes are forbidden (CLAUDE.md). Use functions.',
+        },
+      ],
+    },
   },
   {
     files: ['scripts/**/*.mjs', '.claude/skills/**/*.mjs', 'eslint.config.js'],
