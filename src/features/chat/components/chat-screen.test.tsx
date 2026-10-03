@@ -48,6 +48,40 @@ describe('ChatScreen', () => {
     expect(mockedSend.mock.calls[1]?.[0]).toHaveLength(3);
   });
 
+  it('sends a starter question like a typed one, hides the suggestions, and brings them back after New conversation (B-10)', async () => {
+    mockedSend.mockImplementation(echo);
+    const user = userEvent.setup();
+    render(<ChatScreen />);
+    const suggestions = () => screen.queryByRole('list', { name: 'Suggested questions' });
+    const shownCount = () =>
+      within(screen.getByRole('list', { name: 'Suggested questions' })).getAllByRole('button')
+        .length;
+    expect(shownCount()).toBe(4);
+
+    await user.click(screen.getByRole('button', { name: 'How do deploys work here?' }));
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('log')).getAllByRole('listitem')).toHaveLength(2);
+    });
+    const [question, reply] = within(screen.getByRole('log')).getAllByRole('listitem');
+    expect(question).toHaveTextContent('YouHow do deploys work here?');
+    expect(reply).toHaveTextContent('Re: How do deploys work here?');
+    expect(mockedSend.mock.calls[0]?.[0].map((turn) => turn.content)).toEqual([
+      'How do deploys work here?',
+    ]);
+    expect(suggestions()).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus();
+    const stored = conversationStore.load();
+    expect(stored.ok && stored.conversation.messages.map((m) => m.text)).toEqual([
+      'How do deploys work here?',
+      'Re: How do deploys work here?',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'New conversation' }));
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(shownCount()).toBe(4);
+  });
+
   it('shows an understandable error when the network is down, and recovers on Retry', async () => {
     mockedSend
       .mockRejectedValueOnce(chatError('network', 'Failed to fetch'))

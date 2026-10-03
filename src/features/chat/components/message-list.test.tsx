@@ -27,9 +27,25 @@ const reply = (id: string, text: string, rest: Partial<Message> = {}): Message =
 
 describe('MessageList', () => {
   it('explains what to do when there are no messages', () => {
-    render(<MessageList messages={[]} onRetry={vi.fn()} />);
+    render(<MessageList messages={[]} onRetry={vi.fn()} onAsk={vi.fn()} />);
     expect(screen.getByRole('heading', { name: /ask compass/i })).toBeInTheDocument();
     expect(screen.queryByRole('log')).not.toBeInTheDocument();
+  });
+
+  it('offers the 4 starter questions only while the conversation is empty (B-10)', async () => {
+    const onAsk = vi.fn();
+    const { rerender } = render(<MessageList messages={[]} onRetry={vi.fn()} onAsk={onAsk} />);
+    const suggestions = () => screen.queryByRole('list', { name: 'Suggested questions' });
+    const list = screen.getByRole('list', { name: 'Suggested questions' });
+    expect(within(list).getAllByRole('button')).toHaveLength(4);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'How do deploys work here?' }));
+    expect(onAsk).toHaveBeenCalledWith('How do deploys work here?');
+
+    rerender(<MessageList messages={[user('1', 'Hi')]} onRetry={vi.fn()} onAsk={onAsk} />);
+    expect(suggestions()).not.toBeInTheDocument();
   });
 
   it('renders messages in order, newest last, with distinct author styling', () => {
@@ -37,6 +53,7 @@ describe('MessageList', () => {
       <MessageList
         messages={[user('1', 'How do we name branches?'), reply('2', 'Ask your lead.')]}
         onRetry={vi.fn()}
+        onAsk={vi.fn()}
       />,
     );
     const [mine, theirs] = within(screen.getByRole('log')).getAllByRole('listitem');
@@ -51,6 +68,7 @@ describe('MessageList', () => {
       <MessageList
         messages={[user('1', 'Hi'), reply('2', '', { status: 'streaming' })]}
         onRetry={vi.fn()}
+        onAsk={vi.fn()}
       />,
     );
     expect(screen.getByRole('status', { name: 'Compass is typing' })).toBeInTheDocument();
@@ -60,6 +78,7 @@ describe('MessageList', () => {
       <MessageList
         messages={[user('1', 'Hi'), reply('2', 'Hel', { status: 'streaming' })]}
         onRetry={vi.fn()}
+        onAsk={vi.fn()}
       />,
     );
     expect(screen.queryByRole('status', { name: 'Compass is typing' })).not.toBeInTheDocument();
@@ -73,6 +92,7 @@ describe('MessageList', () => {
       <MessageList
         messages={[user('1', 'Hi'), reply('2', '', { status: 'error', error })]}
         onRetry={onRetry}
+        onAsk={vi.fn()}
       />,
     );
 
@@ -94,6 +114,7 @@ describe('MessageList', () => {
           reply('4', '', { status: 'error', error: auth }),
         ]}
         onRetry={vi.fn()}
+        onAsk={vi.fn()}
       />,
     );
     expect(screen.getAllByRole('alert')).toHaveLength(2);
@@ -105,6 +126,7 @@ describe('MessageList', () => {
       <MessageList
         messages={[user('1', 'Hi'), reply('2', 'Once upon', { status: 'stopped' })]}
         onRetry={vi.fn()}
+        onAsk={vi.fn()}
       />,
     );
     expect(screen.getByText('Once upon')).toBeInTheDocument();
@@ -117,7 +139,11 @@ describe('MessageList', () => {
       actions: [{ status: 'pending', request: { kind: 'list' } }],
     });
     const { rerender } = render(
-      <MessageList messages={[user('u1', "What's on my list?"), pending]} onRetry={vi.fn()} />,
+      <MessageList
+        messages={[user('u1', "What's on my list?"), pending]}
+        onRetry={vi.fn()}
+        onAsk={vi.fn()}
+      />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('Updating your list…');
     expect(screen.queryByLabelText('Compass is typing')).not.toBeInTheDocument();
@@ -126,7 +152,11 @@ describe('MessageList', () => {
       actions: [{ status: 'settled', card: { kind: 'listed', todos: [] } }],
     });
     rerender(
-      <MessageList messages={[user('u1', "What's on my list?"), settled]} onRetry={vi.fn()} />,
+      <MessageList
+        messages={[user('u1', "What's on my list?"), settled]}
+        onRetry={vi.fn()}
+        onAsk={vi.fn()}
+      />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('Your list is empty.');
   });
@@ -142,7 +172,7 @@ describe('MessageList', () => {
       ],
     });
     const { container } = render(
-      <MessageList messages={[user('u1', 'x'), two]} onRetry={vi.fn()} />,
+      <MessageList messages={[user('u1', 'x'), two]} onRetry={vi.fn()} onAsk={vi.fn()} />,
     );
     expect(
       [...container.querySelectorAll('.todo-card')].map((card) => card.getAttribute('data-card')),

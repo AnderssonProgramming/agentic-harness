@@ -1,23 +1,27 @@
 import type { Message } from '../model/message';
+import { STARTER_QUESTIONS } from '../model/starter-questions';
 import { ReplyBody } from './reply-body';
+import { StarterQuestions } from './starter-questions';
 
 interface MessageListProps {
   messages: readonly Message[];
   onRetry: (replyId: string) => void;
+  /** Sends a starter question from the empty state (B-10). */
+  onAsk: (question: string) => void;
 }
 
 const authorLabel = { user: 'You', assistant: 'Compass' } as const;
 
-export function MessageList({ messages, onRetry }: MessageListProps) {
+export function MessageList({ messages, onRetry, onAsk }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="chat-empty">
         <h2>Ask Compass anything about your new team</h2>
         <p>
-          Try &ldquo;What should I learn first in a React codebase?&rdquo; or &ldquo;How do I ask
-          for a code review?&rdquo;. Compass doesn&apos;t know your team&apos;s documents yet, and
-          says so.
+          Pick a question to start, or type your own. Compass doesn&apos;t know your team&apos;s
+          documents yet, and says so.
         </p>
+        <StarterQuestions questions={STARTER_QUESTIONS} onPick={onAsk} />
       </div>
     );
   }

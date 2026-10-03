@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type SubmitEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type RefObject, type SubmitEvent } from 'react';
 import { MAX_MESSAGE_LENGTH, checkDraft } from '../model/message';
 
 interface ComposerProps {
@@ -6,11 +6,14 @@ interface ComposerProps {
   onStop: () => void;
   /** While a reply streams, sending is blocked and Send becomes Stop; typing the next draft still works. */
   replying: boolean;
+  /** Lets the screen return focus to the input after a send that didn't start here (B-10). */
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
 }
 
-export function Composer({ onSend, onStop, replying }: ComposerProps) {
+export function Composer({ onSend, onStop, replying, inputRef: outerRef }: ComposerProps) {
   const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = outerRef ?? ownRef;
   const check = checkDraft(draft);
   const tooLong = !check.valid && check.reason === 'too-long';
 
