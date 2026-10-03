@@ -19,6 +19,8 @@ export interface ChatCoreOptions {
   env: () => Env;
   engineFor?: (env: Env) => Engine;
   idleTimeoutMs?: number;
+  /** Overrides the per-engine wait for the first chunk (`LLM_CONFIG.firstChunkTimeoutMs`), for tests. */
+  firstChunkTimeoutMs?: number;
 }
 
 /** What a transport gives the core for one chat request. */
@@ -50,7 +52,12 @@ function logUsage(engine: Engine, usage: TokenUsage): void {
  * including an unreadable body, travels as an error event with a code.
  */
 export async function runChat(
-  { env, engineFor = selectEngine, idleTimeoutMs = LLM_CONFIG.idleTimeoutMs }: ChatCoreOptions,
+  {
+    env,
+    engineFor = selectEngine,
+    idleTimeoutMs = LLM_CONFIG.idleTimeoutMs,
+    firstChunkTimeoutMs,
+  }: ChatCoreOptions,
   { readBody, send, clientGone }: ChatExchange,
 ): Promise<void> {
   const upstream = new AbortController();
@@ -59,12 +66,14 @@ export async function runChat(
   };
   if (clientGone.aborted) upstream.abort();
   clientGone.addEventListener('abort', stopUpstream);
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-  const restartIdleTimer = () => {
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
+  // One timer, two lengths: the first-chunk wait until the engine sends anything (a cold model
+  // may still be loading, B-13), then the idle gap between chunks. Both abort as a timeout.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const restartTimer = (ms: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
       upstream.abort(IDLE_TIMEOUT);
-    }, idleTimeoutMs);
+    }, ms);
   };
 
   let engineName: string | null = null;
@@ -89,7 +98,7 @@ export async function runChat(
       logUsage(engine, NO_TOKENS);
       return;
     }
-    restartIdleTimer();
+    restartTimer(firstChunkTimeoutMs ?? LLM_CONFIG.firstChunkTimeoutMs[engine.name]);
     let usage = NO_TOKENS;
     for await (const chunk of engine.stream({
       system: SYSTEM_PROMPT,
@@ -97,7 +106,7 @@ export async function runChat(
       todos,
       signal: upstream.signal,
     })) {
-      restartIdleTimer();
+      restartTimer(idleTimeoutMs);
       if (typeof chunk === 'string') send({ type: 'delta', text: chunk });
       else if ('type' in chunk) usage = chunk;
       else send({ type: 'action', action: chunk });
@@ -115,7 +124,7 @@ export async function runChat(
       error: { ...failure.info, engine: failure.info.engine ?? engineName },
     });
   } finally {
-    clearTimeout(idleTimer);
+    clearTimeout(timer);
     clientGone.removeEventListener('abort', stopUpstream);
   }
 }

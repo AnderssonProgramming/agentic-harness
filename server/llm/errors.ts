@@ -1,6 +1,9 @@
 import { chatError, type ChatError } from '../../src/shared/llm/errors.ts';
 
-/** Abort reason the handler uses for its idle timeout, so engines can tell it from a client disconnect. */
+/**
+ * Abort reason the handler uses for its timeouts (the first-chunk wait and the idle gap, B-13),
+ * so engines can tell them from a client disconnect.
+ */
 export const IDLE_TIMEOUT = 'llm-idle-timeout';
 
 /** Maps an HTTP error from a provider to a ChatError. Order matters: quota errors arrive as 400 on Anthropic. */

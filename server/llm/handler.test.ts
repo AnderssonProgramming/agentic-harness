@@ -483,7 +483,12 @@ describe('chat handler', () => {
         yield '';
       },
     };
-    const url = await start({ env: () => mockEnv, engineFor: () => stalled, idleTimeoutMs: 50 });
+    const url = await start({
+      env: () => mockEnv,
+      engineFor: () => stalled,
+      idleTimeoutMs: 50,
+      firstChunkTimeoutMs: 50,
+    });
     expect((await post(url, hi)).at(-1)).toMatchObject({
       type: 'error',
       error: { code: 'timeout' },

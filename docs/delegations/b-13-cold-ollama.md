@@ -31,6 +31,16 @@ Delegated to: the `feature-builder` subagent, in one bounded session. This contr
 - Never run anything with `--debug` or `DEBUG`, never print environment variables, never start a server in the background. Don't read `.env`.
 - One commit per step; set B-13 to `done` at the end, with the evidence file.
 
+## Plan
+
+Written by the `feature-builder` subagent.
+
+| Step | What                                                                                                                                                                                                      | Files                                                                                                              | Criteria |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------- |
+| 1    | Server: per-engine first-chunk timeout in `LLM_CONFIG`, overridable like `idleTimeoutMs`; the core waits for it until the first chunk, then the 20 s idle timeout. Tests.                                 | `server/llm/config.ts`, `server/llm/chat-core.ts`, `server/llm/errors.ts`, `server/llm/handler.test.ts`            | 1, 2, 3  |
+| 2    | Client: `streamChat` waits a first-chunk timeout longer than the server's longest one before the first delta, then its 30 s idle timeout, so the indicator isn't cleared by time alone. Fake-timer tests. | `src/shared/llm/client.ts`, `src/shared/llm/client.test.ts`                                                        | 4        |
+| 3    | Live cold run: a foreground script that unloads `phi3`, starts and stops its own Vite server on Ollama, and records the time to the first chunk. Evidence file, B-13 `done`.                              | `scripts/verify-cold-ollama.mjs`, `package.json` (script only), `docs/evidence/b-13-verification.md`, `BACKLOG.md` | 5, 6     |
+
 ## How you deliver
 
 Commits with hashes; each criterion with its evidence; **"Decisions I made that this contract didn't cover"**; the final `check` result.
