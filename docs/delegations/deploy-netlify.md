@@ -67,6 +67,19 @@ Once approved, this contract **is** the plan.
   - silently dropping user data or part of a request is a product question
   - foreground checks
 
+## Plan
+
+Written by the `feature-builder` subagent on 2026-10-02. One commit per step.
+
+| #   | Step                                                                                                                                                                                                     | Files                                                                                                       | Criterion                      |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 1   | Write this plan                                                                                                                                                                                          | this file                                                                                                   | —                              |
+| 2   | Extract one transport-free core (`runChat`, `engineInfo`) from the Node handler; the `(req, res)` handlers become adapters over it; add a Web `Request` → `Response` adapter that streams NDJSON; ADR-13 | `server/llm/chat-core.ts`, `server/llm/handler.ts`, `server/llm/web-handler.ts`, `ARCHITECTURE.md`          | Same behavior as development   |
+| 3   | The Netlify Function: a default export over the Web adapter, `config.path` for both routes, the rate limit rule; a test drives it with `Request`s; include its folder in typecheck and lint              | `netlify/functions/api.ts`, `server/netlify/api-function.test.ts`, `tsconfig.node.json`, `eslint.config.js` | Same behavior as development   |
+| 4   | The browser client maps any HTTP 429 to `rate_limit`; unit test with `describeChatError`                                                                                                                 | `src/shared/llm/client.ts`, `src/shared/llm/client.test.ts`                                                 | 429 is understood              |
+| 5   | `verify:prod` smoke check, `deploy:preview` and `deploy:prod` scripts, the "Production (Netlify)" note                                                                                                   | `scripts/verify-prod.mjs`, `package.json`, `.env.example`                                                   | verify:prod                    |
+| 6   | Run every check and record the evidence (verify:prod against a local `vite preview` on the mock; the Netlify emulation command for the PO)                                                               | `docs/evidence/deploy-netlify-verification.md`                                                              | Local emulation, no regression |
+
 ## How you deliver
 
 1. Commits with hashes.
