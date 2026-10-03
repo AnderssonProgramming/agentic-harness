@@ -85,6 +85,21 @@ Baseline: every fresh session starts at **about 30,000 tokens** before any work 
 - **Signal:** **it repeated a corrected error for the fifth time.** An inline `node -` script with regex backslashes was mangled by the shell, so one ADR commit didn't land. The correction has been in memory and in this log since Sprint 2 ("use the file tool for anything with backslashes").
 - **What I did:** switched to the Edit tool for the change. The rule itself was already right; the session failed to apply it. That matches the routine's diagnosis: in a session this long, an old correction gets buried. It's another reason the PO session should stay thin and delegate. This sprint's code was all written by subagents, but the orchestrator still wrote scripts for its own checks.
 
+## Session 7: the deployment subagent's diagnostic run (2026-10-02)
+
+- **Task:** deployment Amendment 1, pass 2 (`feature-builder`, headless): run `netlify serve` locally and verify it.
+- **Size:** 100 turns, 103k tokens at the end, $1.98.
+- **What happened:** the local server wouldn't answer, so the agent ran `netlify serve --debug` to diagnose it, with the real `.env` loaded. `DEBUG=*` made the tooling print the resolved environment, real key included, into a background-task log. That server then **outlived the session**: the PO session found it still running, with the key in its environment, listening on every interface (`::`:8888). The agent reported the leak itself, at the top of its delivery.
+- **Symptom:** none of the routine's four signals. This is a new class of failure: **a diagnostic step with a side effect on secrets**. No rule mentioned debug output, and the deny list only covers _reading_ `.env`, not printing what a tool loaded from it.
+- **What I did:**
+  - stopped the server;
+  - found every local file holding the real key (3, counted against `.env` without printing it) and deleted the two temp ones;
+  - asked the PO to rotate the key.
+  - Amendment 2 made the local production run **structurally unable** to hold a secret: `serve:prod` blanks every secret, refuses debug flags and variables, and `verify:prod:local` always stops its server, in the foreground. It ran at 83k tokens.
+  - Two new Forbidden rules in `CLAUDE.md` (`75040ea`).
+  - Correcting the memory: "background tasks die with the reply" holds for commands, **not for servers**.
+- **Also seen while verifying:** from PowerShell, `npm run serve:prod -- --debug` loses the `--`, so npm swallows `--debug` and the server starts normally (secrets still blanked; it had to be stopped by hand). The refusal itself works from Bash, and `verify:prod:local` takes no arguments, so it's the documented path.
+
 ## The pattern
 
 | Cause                                                                                    | Seen in                                     | Cost                                                            |

@@ -116,3 +116,27 @@ First-pass findings 1, 2 and 4 are resolved by Amendment 1. Finding 3 was re-def
 2. **The rate-limit message says "Wait a few seconds".** The platform window is up to 3 minutes. That copy is a product decision, so it wasn't changed.
 3. **TECH-DEBT D-03 becomes due.** "When to fix: when the app is exposed to users other than its owner (after week 8's deployment)." Provider error bodies still reach the browser.
 4. **There's no `netlify.toml`.** CLAUDE.md forbids editing deployment configuration, and the contract doesn't create that file. So the build command, publish directory and functions directory have to be set in the Netlify UI (see the delivery report). If they're missing, the first preview publishes the wrong folder. `verify:prod`'s `app-js` check catches that (an unbuilt `index.html` references `/src/main.tsx`, not a `.js` file).
+
+## Amendment 2: the PO's independent verification (2026-10-02)
+
+Run by the PO session, not taken from the subagent's report.
+
+| Check                                                                           | Result                                                                          |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `npm run -s check`, 3 times in a row                                            | 3/3 passed, 311 tests each                                                      |
+| `npm run -s verify:prod:local` **under load** (`npm test` running concurrently) | exit 0                                                                          |
+| `npm run -s verify:prod:local`, idle                                            | exit 0; `"engine": "mock"`, `injectedSecrets: []`, both ports closed afterwards |
+| Real-key shapes in either run's output                                          | 0                                                                               |
+| `npm run -s serve:prod -- --debug` (Bash)                                       | refused, exit 2, no server started                                              |
+| `DEBUG='*' npm run -s serve:prod` (Bash)                                        | refused, exit 2                                                                 |
+| `netlify` processes or listeners on 8888/3999 after the runs                    | none                                                                            |
+
+**Finding (Low):** from **PowerShell**, `npm run serve:prod -- --debug` loses the `--`, so npm consumes `--debug` and the wrapper starts normally. The secrets were still blanked (the CLI reported `ANTHROPIC_API_KEY` as _ignored, defined in process_). But the server had to be stopped by hand. `verify:prod:local` takes no arguments, so it's the documented way to run production locally, and it always stops its server.
+
+**The leak's footprint:** the real key was in 3 local files, counted against `.env` without printing it:
+
+- the task log from the `--debug` run, now deleted;
+- the PO's copy of the subagent transcript, now deleted;
+- Claude Code's own history of that subagent session, left for the PO to decide.
+
+Every other key-shaped string in local transcripts is a deliberately fake test fixture. **The key must be rotated before the first deployment.**
