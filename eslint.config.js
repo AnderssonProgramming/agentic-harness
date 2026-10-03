@@ -80,7 +80,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs', '.claude/skills/**/*.mjs', 'eslint.config.js'],
+    files: [
+      'scripts/**/*.mjs',
+      '.claude/skills/**/*.mjs',
+      'harness-kit/**/*.mjs',
+      'eslint.config.js',
+    ],
     languageOptions: { globals: globals.node },
   },
   prettier,
