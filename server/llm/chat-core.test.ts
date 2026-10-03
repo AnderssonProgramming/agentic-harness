@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_FIRST_CHUNK_TIMEOUT_MS } from '../../src/shared/llm/client.ts';
 import type { StreamEvent } from '../../src/shared/llm/protocol.ts';
 import { runChat } from './chat-core.ts';
 import { LLM_CONFIG } from './config.ts';
@@ -74,6 +75,12 @@ describe('first-chunk and idle timeouts (B-13)', () => {
       mock: 30_000,
     });
     expect(idle).toBe(20_000);
+  });
+
+  it("gives the browser a longer first-chunk wait than any engine's, so the server's timeout arrives first", () => {
+    for (const ms of Object.values(LLM_CONFIG.firstChunkTimeoutMs)) {
+      expect(DEFAULT_FIRST_CHUNK_TIMEOUT_MS).toBeGreaterThan(ms);
+    }
   });
 
   it('completes when the first chunk arrives after the idle timeout but before the first-chunk timeout', async () => {

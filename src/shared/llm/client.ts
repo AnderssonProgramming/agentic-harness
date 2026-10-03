@@ -39,8 +39,10 @@ export interface StreamChatOptions {
   onStart?: (source: EngineInfo) => void;
   /** Aborting it stops the reply; streamChat then rejects with code "aborted". */
   signal?: AbortSignal;
-  /** Fails with "timeout" when no data arrives for this long. */
+  /** After the first delta or action, fails with "timeout" when no data arrives for this long. */
   idleTimeoutMs?: number;
+  /** Before the first delta or action, fails with "timeout" after this long (B-13). */
+  firstChunkTimeoutMs?: number;
   endpoint?: string;
 }
 
@@ -56,6 +58,11 @@ export function requestBody(messages: readonly ChatTurn[], todos?: readonly Todo
   return JSON.stringify(todos ? { messages: sent, todos } : { messages: sent });
 }
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
+/**
+ * Longer than the server's longest first-chunk wait (120 s, a cold Ollama model, B-13), so the
+ * server's own timeout arrives first and the typing indicator isn't cleared while a model loads.
+ */
+export const DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 150_000;
 const IDLE_TIMEOUT = 'idle-timeout';
 
 /**
@@ -68,6 +75,8 @@ export async function streamChat(
   options: StreamChatOptions,
 ): Promise<void> {
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+  const firstChunkTimeoutMs = options.firstChunkTimeoutMs ?? DEFAULT_FIRST_CHUNK_TIMEOUT_MS;
+  let replying = false;
   const controller = new AbortController();
   const stopFromCaller = () => {
     controller.abort();
@@ -76,11 +85,15 @@ export async function streamChat(
   if (options.signal?.aborted) controller.abort();
 
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  // The `start` event arrives at once, but the model's first words may not (B-13).
   const restartIdleTimer = () => {
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      controller.abort(IDLE_TIMEOUT);
-    }, idleTimeoutMs);
+    idleTimer = setTimeout(
+      () => {
+        controller.abort(IDLE_TIMEOUT);
+      },
+      replying ? idleTimeoutMs : firstChunkTimeoutMs,
+    );
   };
 
   let engine: string | null = null;
@@ -104,8 +117,10 @@ export async function streamChat(
 
     let finished = false;
     for await (const line of readLines(response.body, controller.signal)) {
-      restartIdleTimer();
-      if (line.trim() === '') continue;
+      if (line.trim() === '') {
+        restartIdleTimer();
+        continue;
+      }
       let event: unknown;
       try {
         event = JSON.parse(line);
@@ -115,6 +130,8 @@ export async function streamChat(
       if (!isStreamEvent(event)) {
         throw chatError('malformed', `Unknown event: ${line.slice(0, 120)}`, engine);
       }
+      if (event.type === 'delta' || event.type === 'action') replying = true;
+      restartIdleTimer();
       if (event.type === 'start') {
         engine = event.engine;
         options.onStart?.({ engine: event.engine, model: event.model, actions: event.actions });
@@ -135,7 +152,11 @@ export async function streamChat(
     if (isChatError(error)) throw error;
     if (options.signal?.aborted) throw chatError('aborted', 'Stopped by the user', engine);
     if (controller.signal.reason === IDLE_TIMEOUT)
-      throw chatError('timeout', `No data for ${String(idleTimeoutMs)} ms`, engine);
+      throw chatError(
+        'timeout',
+        `No data for ${String(replying ? idleTimeoutMs : firstChunkTimeoutMs)} ms`,
+        engine,
+      );
     // fetch rejects with a TypeError when the network is down or the server is unreachable.
     throw chatError('network', error instanceof Error ? error.message : String(error), engine);
   } finally {

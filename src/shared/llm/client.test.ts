@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchEngineInfo, streamChat } from './client.ts';
+import { DEFAULT_FIRST_CHUNK_TIMEOUT_MS, fetchEngineInfo, streamChat } from './client.ts';
 import { describeChatError, isChatError, type ChatError } from './errors.ts';
 import type { StreamEvent } from './protocol.ts';
 
@@ -177,11 +177,100 @@ describe('streamChat', () => {
     expect(error.info).toMatchObject({ code: 'aborted', retryable: false });
   });
 
-  it('reports "timeout" when no data arrives within the idle limit', async () => {
+  it('reports "timeout" when no data arrives within the idle limit after the first delta', async () => {
     mockFetch(
-      ndjson([{ type: 'start', engine: 'mock', model: 'echo', actions: true }], { close: false }),
+      ndjson(
+        [
+          { type: 'start', engine: 'mock', model: 'echo', actions: true },
+          { type: 'delta', text: 'Hel' },
+        ],
+        { close: false },
+      ),
     );
     const error = await failure(streamChat(history, { onDelta: vi.fn(), idleTimeoutMs: 50 }));
     expect(error.info.code).toBe('timeout');
+  });
+});
+
+/** A response whose events the test writes one at a time, so fake timers decide when. */
+function controlledStream() {
+  const encoder = new TextEncoder();
+  let writer: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      writer = controller;
+    },
+  });
+  return {
+    response: new Response(body, { headers: { 'content-type': 'application/x-ndjson' } }),
+    write: (event: StreamEvent) => writer?.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)),
+    close: () => writer?.close(),
+  };
+}
+
+describe('streamChat waiting for the first chunk (B-13)', () => {
+  const start: StreamEvent = { type: 'start', engine: 'ollama', model: 'phi3', actions: false };
+
+  it('stays pending past the idle limit while the model loads, then completes', async () => {
+    vi.useFakeTimers();
+    const stream = controlledStream();
+    mockFetch(stream.response);
+    const onDelta = vi.fn();
+    let settled = false;
+    const reply = streamChat(history, { onDelta }).finally(() => {
+      settled = true;
+    });
+    stream.write(start);
+    // Well past the 30 s idle limit, and past the server's 120 s first-chunk wait for Ollama:
+    // time alone doesn't end the wait while the server may still answer.
+    await vi.advanceTimersByTimeAsync(DEFAULT_FIRST_CHUNK_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    expect(onDelta).not.toHaveBeenCalled();
+    stream.write({ type: 'delta', text: 'Hello' });
+    stream.write({ type: 'done' });
+    stream.close();
+    await reply;
+    expect(onDelta).toHaveBeenCalledWith('Hello');
+  });
+
+  it('ends in "timeout" only once the first-chunk limit passes with no reply at all', async () => {
+    vi.useFakeTimers();
+    const stream = controlledStream();
+    mockFetch(stream.response);
+    const reply = failure(streamChat(history, { onDelta: vi.fn() }));
+    stream.write(start);
+    await vi.advanceTimersByTimeAsync(DEFAULT_FIRST_CHUNK_TIMEOUT_MS);
+    expect((await reply).info).toMatchObject({ code: 'timeout', engine: 'ollama' });
+  });
+
+  it("shows the server's timeout when the server gives up first", async () => {
+    vi.useFakeTimers();
+    const stream = controlledStream();
+    mockFetch(stream.response);
+    const reply = failure(streamChat(history, { onDelta: vi.fn() }));
+    stream.write(start);
+    await vi.advanceTimersByTimeAsync(120_000);
+    stream.write({
+      type: 'error',
+      error: {
+        code: 'timeout',
+        message: 'ollama sent nothing for too long',
+        engine: 'ollama',
+        retryable: true,
+      },
+    });
+    expect((await reply).info).toMatchObject({ code: 'timeout', engine: 'ollama' });
+  });
+
+  it('switches to the idle limit after the first delta', async () => {
+    vi.useFakeTimers();
+    const stream = controlledStream();
+    mockFetch(stream.response);
+    const reply = failure(streamChat(history, { onDelta: vi.fn() }));
+    stream.write(start);
+    await vi.advanceTimersByTimeAsync(60_000);
+    stream.write({ type: 'delta', text: 'Hel' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect((await reply).info.code).toBe('timeout');
   });
 });
