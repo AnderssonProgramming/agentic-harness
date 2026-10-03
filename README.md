@@ -117,6 +117,19 @@ Screens added by new-route follow the same layout plus api/ (ADR-07).
 
 Details, including how to point the coding agent itself at Ollama, are in [ARCHITECTURE.md](ARCHITECTURE.md#inference-engine).
 
+## Deploy (Netlify)
+
+Production is the static app from `dist/` plus two Netlify Functions in `netlify/functions/`: `chat.ts` serves `/api/chat` and `engine.ts` serves `/api/engine`. Both are thin adapters over the same chat core that `npm run dev` uses (ADR-13). The build command, publish directory, functions directory and Node version are all in `netlify.toml`, so the Netlify UI needs no build settings.
+
+1. `npx netlify login`
+2. `npx netlify init` (create a new site) or `npx netlify link` (an existing one). Accept the settings it reads from `netlify.toml`.
+3. In the Netlify UI, under Site configuration > Environment variables, set `ANTHROPIC_API_KEY` (mark it as secret). `INFERENCE_ENGINE` and `ANTHROPIC_MODEL` are optional; see `.env.example`.
+4. In the Anthropic console, set a monthly spend limit. It's the only global cap.
+5. `npm run deploy:preview`, then `npm run verify:prod -- <draft URL>`.
+6. `npm run deploy:prod` once the preview passes.
+
+`npm run serve:prod` builds the app and serves it with the Functions locally, for `npm run verify:prod -- <local URL>`.
+
 ## Troubleshooting
 
 - **Port 5173 is already in use:** the dev server uses `strictPort`, so it fails instead of silently moving. Stop the other process or run `npm run dev -- --port 5174`.

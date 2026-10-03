@@ -1,0 +1,11 @@
+# Every build setting lives here, reviewed as code (CLAUDE.md, "Forbidden": the netlify.toml exception).
+# Secrets are not set here: they go in the site's environment in the Netlify UI (ADR-03).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
