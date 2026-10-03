@@ -54,3 +54,7 @@ The run before the first release. The code changed since `63f993c`: the shared c
 Same failed criteria, same risks: PER-01 (TECH-DEBT D-01) and PERF-01 (D-02). **Triage: no change.** Both stay deferred under their existing triggers. The auditor re-checked the input limits, history bound, prompt bound and cancel-on-disconnect in the core and in both adapters, and they still hold.
 
 One uncounted observation: the HTTP 429 → `rate_limit` path (`src/shared/llm/client.ts:96-99`) is covered by a unit test but by no verify script. It can only be exercised against the deployed site, because the limit is enforced by the platform.
+
+## Release run (`6cbab8e`, 2026-10-03)
+
+Re-run because the release gate's dependency check changed (`scripts/`). Same result as `2a0eec9`: 0 Critical, 0 High, 2 Medium (PER-01 = D-01, PERF-01 = D-02). **Triage: no change.** The run hit TECH-DEBT D-05 again: `verify:chat` failed three times until it got a folder that already existed.
