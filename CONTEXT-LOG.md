@@ -99,6 +99,7 @@ Baseline: every fresh session starts at **about 30,000 tokens** before any work 
   - Two new Forbidden rules in `CLAUDE.md` (`75040ea`).
   - Correcting the memory: "background tasks die with the reply" holds for commands, **not for servers**.
 - **Also seen while verifying:** from PowerShell, `npm run serve:prod -- --debug` loses the `--`, so npm swallows `--debug` and the server starts normally (secrets still blanked; it had to be stopped by hand). The refusal itself works from Bash, and `verify:prod:local` takes no arguments, so it's the documented path.
+- **Found a day later (2026-10-03, first release):** two more orphans, `vite preview --mode mock` on ports 4321 and 4322, started in the background by the **first** deployment pass. They held Vite's native file open, so `npm ci` failed with EPERM until they were stopped. Same cause, so the rule already added covers it.
 
 ## The pattern
 
