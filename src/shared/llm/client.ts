@@ -92,6 +92,11 @@ export async function streamChat(
       body: requestBody(messages, options.todos),
       signal: controller.signal,
     });
+    // The platform's rate limit (Netlify) answers a plain 429 before our endpoint runs.
+    if (response.status === 429) {
+      void response.body?.cancel().catch(() => undefined);
+      throw chatError('rate_limit', 'HTTP 429 Too Many Requests', engine);
+    }
     const type = response.headers.get('content-type') ?? '';
     if (!response.body || !type.includes('application/x-ndjson')) {
       throw chatError('malformed', `Unexpected response: HTTP ${String(response.status)} ${type}`);

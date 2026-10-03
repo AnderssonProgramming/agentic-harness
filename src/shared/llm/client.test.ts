@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchEngineInfo, streamChat } from './client.ts';
-import { isChatError, type ChatError } from './errors.ts';
+import { describeChatError, isChatError, type ChatError } from './errors.ts';
 import type { StreamEvent } from './protocol.ts';
 
 function ndjson(lines: (StreamEvent | string)[], { close = true } = {}) {
@@ -142,6 +142,28 @@ describe('streamChat', () => {
     );
     expect((await failure(streamChat(history, { onDelta: vi.fn() }))).info.code).toBe('malformed');
   });
+
+  it.each([
+    ['a plain-text 429', new Response('Too Many Requests', { status: 429 })],
+    ['a 429 with no body', new Response(null, { status: 429 })],
+    [
+      'a 429 that claims to be NDJSON',
+      new Response('', { status: 429, headers: { 'content-type': 'application/x-ndjson' } }),
+    ],
+  ])(
+    'reports "rate_limit" for %s, as the platform limit sends (deploy)',
+    async (_label, response) => {
+      const onDelta = vi.fn();
+      mockFetch(response);
+      const error = await failure(streamChat(history, { onDelta }));
+      expect(error.info.code).toBe('rate_limit');
+      expect(error.info.retryable).toBe(true);
+      expect(describeChatError(error.info)).toBe(
+        'Too many requests right now. Wait a few seconds and try again.',
+      );
+      expect(onDelta).not.toHaveBeenCalled();
+    },
+  );
 
   it('reports "aborted" when the caller stops the reply', async () => {
     const controller = new AbortController();
