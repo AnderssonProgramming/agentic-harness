@@ -52,7 +52,9 @@ const walk = (dir) =>
   });
 const install = (sourceDir) => {
   for (const file of walk(sourceDir)) {
-    const rel = relative(sourceDir, file);
+    // Templates keep `.claude/` as `dot-claude/`, so Claude Code never discovers the kit's own
+    // skills as if they belonged to the project that holds the kit.
+    const rel = relative(sourceDir, file).replace(/^dot-claude(?=[\\/])/, '.claude');
     if (rel === 'profile.json') continue;
     const dest = join(target, rel);
     if (existsSync(dest)) {

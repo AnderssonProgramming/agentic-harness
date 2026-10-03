@@ -32,7 +32,7 @@ for (const rel of required) if (!existsSync(join(target, rel))) problems.push(`m
 // because templates such as _TEMPLATE.md keep their fields on purpose.
 const walk = (dir) =>
   readdirSync(dir).flatMap((entry) => {
-    if (['node_modules', '.git', 'dist', 'build'].includes(entry)) return [];
+    if (['node_modules', '.git', 'dist', 'build', 'harness-kit'].includes(entry)) return [];
     const path = join(dir, entry);
     return statSync(path).isDirectory() ? walk(path) : [path];
   });

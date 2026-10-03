@@ -11,6 +11,8 @@ Rules for the auditor:
 
 `npm run audit:facts` provides the facts a script can establish.
 
+Criterion IDs must look like `ABC-01` (capital letters, a dash, two digits), e.g. `CALC-01`. `audit:validate` recognises only that shape.
+
 ## Secrets (SEC)
 
 | ID     | Check                                                                                                   | How to check                                                                                      | Risk if failed |
