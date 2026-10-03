@@ -1,0 +1,8 @@
+{
+  "secretEnvVars": [],
+  "build": { "command": "npm run build", "outDir": "dist" },
+  "release": {
+    "codePaths": ["src", "package.json", "package-lock.json"],
+    "acceptedAdvisoryRoots": []
+  }
+}
