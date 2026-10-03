@@ -117,3 +117,15 @@ Written by the `feature-builder` subagent on 2026-10-02. One commit per step.
 ### Limits
 
 The same as the original. One commit per decision.
+
+### Plan (Amendment 1)
+
+Written by the `feature-builder` subagent on 2026-10-02. One commit per step.
+
+| #   | Step                                                                                                                         | Files                                                                                             | Criterion                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- |
+| A1  | Write this plan                                                                                                              | this file                                                                                         | —                         |
+| A2  | `netlify.toml` with build command, publish dir, functions dir and Node 22; a README deploy section with no UI build settings | `netlify.toml`, `README.md`                                                                       | `netlify.toml`            |
+| A3  | Split into two Functions (chat 6/180, engine 60/180), both over the Web adapter; test both rules and paths; update ADR-13    | `netlify/functions/chat.ts`, `netlify/functions/engine.ts`, `server/llm/netlify-function.test.ts` | Two Functions             |
+| A4  | The new rate-limit wording, and the tests and checks that assert it                                                          | `src/shared/llm/errors.ts`, `src/shared/llm/client.test.ts`                                       | Rate-limit text           |
+| A5  | `npm run serve:prod`; run it with `verify:prod` on the mock; run every regression check; record the evidence                 | `package.json`, `docs/evidence/deploy-netlify-verification.md`                                    | serve:prod, no regression |
