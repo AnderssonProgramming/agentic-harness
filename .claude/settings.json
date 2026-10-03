@@ -18,7 +18,14 @@
       "Bash(npm run audit:facts)",
       "Bash(npm run audit:validate:*)",
       "Bash(npm run verify:todos)",
-      "Bash(npm run verify:persistence:*)"
+      "Bash(npm run verify:persistence:*)",
+      "Skill(release)",
+      "Bash(npm run release:gate)",
+      "Bash(npm run release:notes:*)",
+      "Bash(npm run -s release:deploy:*)",
+      "Bash(npm run verify:prod:*)",
+      "Bash(npm run verify:prod:local)",
+      "Bash(npm version:*)"
     ],
     "deny": [
       "Read(./node_modules/**)",
