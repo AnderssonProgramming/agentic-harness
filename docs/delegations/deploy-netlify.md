@@ -87,3 +87,33 @@ Written by the `feature-builder` subagent on 2026-10-02. One commit per step.
 3. **The exact commands the PO must run, in order:** log in, create or link the site, set environment variables (name the variables only, never values), and the first preview deploy.
 4. Decisions I made that this contract didn't cover.
 5. The final `npm run -s check`.
+
+## Amendment 1 (after the first pass, approved by the PO on 2026-10-02)
+
+### PO decisions on the questions you raised
+
+1. **`netlify.toml` is allowed** (decision 8 overruled; CLAUDE.md now has an explicit exception). Move the build settings into it: build command, publish dir, functions dir, and Node 22. The README's deploy steps must then have **no manual build-settings step**.
+2. **Split the routes:** `/api/engine` must not spend the chat's rate limit. Use **two Functions**:
+   - chat keeps `windowLimit: 6, windowSize: 180` per IP;
+   - engine info gets its own rule, `windowLimit: 60, windowSize: 180` per IP.
+
+   That uses both of the free plan's 2 rules. Both stay thin adapters over the shared core (ADR-13). Update ADR-13 to say so.
+
+3. **Rate-limit wording:** the user-facing text for `rate_limit` becomes "Too many requests right now. Wait a couple of minutes and try again." Update the tests that assert it.
+4. **D-03 isn't fixed** (re-deferred by the PO; see TECH-DEBT D-03).
+
+### A harness fix for local emulation
+
+`npx` needs approval in headless sessions. Add `npm run serve:prod` = `netlify serve` (or the equivalent that builds and serves the app plus Functions locally), and use it to run `npm run verify:prod -- <local url>` on the mock engine. Report the exact command and its result. If `netlify serve` needs the site to be linked, or anything else from the PO, stop and say exactly what.
+
+### Acceptance criteria
+
+- [ ] `netlify.toml` holds every build setting. The README's deploy section has no UI build-settings step.
+- [ ] Two Functions, each with its own `config.rateLimit`. A test checks both rules and their paths against `LLM_CONFIG`.
+- [ ] The rate-limit text is as above, with tests updated.
+- [ ] `npm run serve:prod` plus `verify:prod` locally on the mock: met, or blocked with the exact reason.
+- [ ] No regression: `npm run -s check`, and `verify:llm`, `verify:chat` and `verify:todos`, with screenshots in a git-ignored folder inside the repo.
+
+### Limits
+
+The same as the original. One commit per decision.
