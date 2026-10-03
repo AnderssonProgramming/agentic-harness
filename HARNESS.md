@@ -16,20 +16,31 @@ Each rule in it exists because something failed without it. The table in "Learne
 
 ## Install it in a new project
 
-You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it goes into an existing project with a `package.json`.
+You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it goes into an existing project with a `package.json`. **The kit is never copied into the project.** You run it from wherever it is (this repository, or a copy of `harness-kit/` elsewhere), and it writes into the project. Below, `<kit>` is the path to that folder.
+
+### Before you start: permissions
+
+If an agent does the install for you, it needs to run these without asking. In an interactive session, approve them when asked. In a headless one (`claude -p`), pass them with `--allowedTools`, or the install stops at the first one:
+
+- `npm init` and `npm install` (step 1 only);
+- `git init`, `git add`, `git commit`;
+- `node <kit>/install.mjs` and `node <kit>/doctor.mjs`;
+- `npm run`.
+
+Nothing else. The kit's own settings take over once it's installed.
 
 1. **Create the project, its tools and a git repository.** Any npm project works. For example:
-   - `npm create vite@latest my-app -- --template react-ts`
-   - `cd my-app`
-   - `npm install`
-   - `git init`
+   - a web app: `npm create vite@latest my-app -- --template react-ts`, then `cd my-app` and `npm install`;
+   - anything else (a CLI, a library): `npm init -y` and your own folders.
 
-   Also install the formatter, linter and test runner that step 3's `check` will run, **now**. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one. Make sure `.gitignore` contains `.env`.
+   Then `git init`, and make sure `.gitignore` contains `.env`.
 
-2. **Copy the kit and install it.** Copy the `harness-kit/` folder from this repository into the new project, then run:
+   Also install the formatter, linter and test runner that step 3's `check` will run, **now**, with versions you choose. Write those versions into `CLAUDE.md`'s "Stack and versions" in step 4: an unpinned install today may get a newer major than your examples assume. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one.
+
+2. **Install the kit into the project:**
 
    ```sh
-   node harness-kit/install.mjs . --name "My Product"
+   node <kit>/install.mjs <project dir> --name "My Product"
    ```
 
    Add `--profile netlify` if the project deploys to Netlify (see "Profiles"). The installer never overwrites an existing file; it lists the ones it kept. It adds the `audit:*` and `context:profile` npm scripts, and tells you which scripts the harness relies on that the project lacks.
@@ -39,27 +50,34 @@ You need Node.js 22+, git, and Claude Code. The kit doesn't create your app: it 
    - `check`: everything that must pass before a commit, e.g. `tsc --noEmit && eslint . && prettier --check . && vitest run`
    - `test`: the tests, once
 
-   The tools come from step 1. If `check` doesn't exist, the agent has nothing to stop it from committing broken code.
+   **`check` must pass on the install commit**, before any feature exists. A test runner fails with no tests and `tsc` fails with no source files. So either add one placeholder source file and one trivial test, or configure the runner to pass with no tests (Vitest: `passWithNoTests: true`). Remove the placeholder when the first item adds real code. If `check` doesn't exist, the agent has nothing to stop it from committing broken code.
 
 4. **Fill in the fields.** Every `{{FIELD}}` in the installed files is a decision only you can make:
-   - **`CLAUDE.md`:** what the product is and for whom, the stack, approved dependencies, code standards, commands. **Required before the first session.**
+   - **`CLAUDE.md`:** what the product is and for whom, the stack with pinned versions, approved dependencies, code standards, commands. **Required before the first session.**
    - **`harness.config.json`:** the names of your secret env vars (the audit searches the build for them) and the build command and output folder (or `"build": null`).
    - **`BACKLOG.md`:** the first item, with criteria you can verify.
    - **`ARCHITECTURE.md`:** the first ADRs, as soon as you decide something.
-   - **`AUDIT-CRITERIA.md`:** before the first audit, from the product's promises.
+   - **`AUDIT-CRITERIA.md`:** before the first audit, from the product's promises. Delete the criteria that don't apply (no build, no secrets, no storage). Criterion IDs must look like `ABC-01`, or `audit:validate` won't see them.
 
    `_TEMPLATE.md`, `TASKS.md`, `TECH-DEBT.md` and `CONTEXT-LOG.md` keep their fields; they're templates for later entries.
 
 5. **Run the doctor:**
 
    ```sh
-   node harness-kit/doctor.mjs .
+   node <kit>/doctor.mjs <project dir>
    ```
 
-   It fails on missing layer files, unfilled fields in `CLAUDE.md`, the settings or the config, missing npm scripts, a `.env` git doesn't ignore, or settings that don't deny reading `.env`. Fix until it says `Harness OK.`
+   It fails on any of these:
+   - missing layer files;
+   - unfilled fields in `CLAUDE.md`, the settings or the config;
+   - missing npm scripts;
+   - a `.env` that git doesn't ignore;
+   - settings that don't deny reading `.env`.
+
+   Fix until it says `Harness OK.` Then run `npm run check`: it must pass too.
 
 6. **Commit the harness** on its own: `chore: install the agent harness`.
-7. **Smoke-test it.** Start `claude` in the project and ask for a small backlog item. The agent should:
+7. **Smoke-test it, in a new session.** Start `claude` in the project and ask for the first backlog item. The agent should:
    1. propose a plan in `docs/plans/` and wait;
    2. after your "approved", execute one step per commit, running `format` and `check` each time;
    3. report each criterion with its evidence.
