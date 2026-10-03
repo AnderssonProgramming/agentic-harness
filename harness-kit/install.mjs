@@ -119,7 +119,7 @@ if (skipped.length) console.log(`  kept existing: ${skipped.join(', ')}`);
 if (addedScripts.length) console.log(`  npm scripts added: ${addedScripts.join(', ')}`);
 if (missingCore.length) {
   console.log(
-    `  MISSING npm scripts the harness relies on: ${missingCore.join(', ')} (HARNESS.md, step 3)`,
+    `  MISSING npm scripts the harness relies on: ${missingCore.join(', ')} (HARNESS.md, step 2)`,
   );
 }
 console.log(

@@ -28,37 +28,47 @@ claude --add-dir <folder holding HARNESS.md and harness-kit/>
 
 In a session that's already running, use `/add-dir`. In this repository, that folder is the repository root.
 
-It also needs to run these without asking. In an interactive session, approve them when asked. In a headless one (`claude -p`), pass them with `--allowedTools`, or the install stops at the first one:
+It also needs to run these without asking. In an interactive session, approve them when asked. In a headless one (`claude -p`), pass them as below, or the install stops at the first one. Name the scripts themselves: a rule that ends in a folder, such as `Bash(node ../harness-kit/:*)`, doesn't match.
 
-- `npm init` and `npm install` (step 1 only);
-- `git init`, `git add`, `git commit`;
-- `node <kit>/install.mjs` and `node <kit>/doctor.mjs`;
-- `npm run`.
+```sh
+claude -p "<your request>" --add-dir .. --permission-mode acceptEdits --allowedTools \
+  "Bash(npm init:*)" "Bash(npm install:*)" "Bash(npm run:*)" \
+  "Bash(git init:*)" "Bash(git add:*)" "Bash(git commit:*)" "Bash(git status:*)" \
+  "Bash(node ../harness-kit/install.mjs:*)" "Bash(node ../harness-kit/doctor.mjs:*)"
+```
 
-Nothing else. The kit's own settings take over once it's installed.
+(That example has the kit at `../harness-kit`; use your own path.) Nothing else is needed. The kit's own settings take over once it's installed.
 
 1. **Create the project, its tools and a git repository.** Any npm project works. For example:
    - a web app: `npm create vite@latest my-app -- --template react-ts`, then `cd my-app` and `npm install`;
-   - anything else (a CLI, a library): `npm init -y` and your own folders.
+   - anything else (a CLI, a library): `npm init -y`, then fix what it assumes:
+     - replace its `test` script, which always fails (`echo "Error: no test specified" && exit 1`);
+     - set `"type": "module"` if you write ES modules (npm 11 writes `"commonjs"`).
 
    Then `git init`, and make sure `.gitignore` contains `.env`.
 
-   Also install the formatter, linter and test runner that step 3's `check` will run, **now**, with versions you choose. Write those versions into `CLAUDE.md`'s "Stack and versions" in step 4: an unpinned install today may get a newer major than your examples assume. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one.
+   Also install the formatter, linter and test runner that `check` will run, **now**, with exact versions (`npm install -D -E …`). Write those versions into `CLAUDE.md`'s "Stack and versions" in step 4: an unpinned install today may get a newer major than your examples assume. Once the kit is in, its settings put `npm install` on "ask": every later install needs your approval, and a headless session can't get one.
 
-2. **Install the kit into the project:**
+   If npm warns that a dependency's install script was skipped (npm 11 does this, e.g. for `esbuild` under `tsx`), approve it now if the tool needs it, and run the tool once to prove it works.
+
+2. **Give the project the three commands the harness runs on every step,** before installing the kit. The installer only reports missing scripts; it doesn't write them.
+   - `format`: the formatter writes files, e.g. `prettier --write .`
+   - `check`: everything that must pass before a commit, e.g. `tsc --noEmit && eslint . && prettier --check . && vitest run`
+   - `test`: the tests, once
+
+   **`check` must pass on the install commit,** before any feature exists. Two tools fail on an empty project:
+   - the test runner, with no tests: configure it to pass (Vitest: `passWithNoTests: true`);
+   - `tsc`, with no input: include the runner's config file in `tsconfig.json`, or add one placeholder source file. TypeScript 7 with no input prints its help and exits 1, which looks unrelated.
+
+   Run `check` now. If it doesn't exist, the agent has nothing to stop it from committing broken code.
+
+3. **Install the kit into the project:**
 
    ```sh
    node <kit>/install.mjs <project dir> --name "My Product"
    ```
 
-   Add `--profile netlify` if the project deploys to Netlify (see "Profiles"). The installer never overwrites an existing file; it lists the ones it kept. It adds the `audit:*` and `context:profile` npm scripts, and tells you which scripts the harness relies on that the project lacks.
-
-3. **Give the project the three commands the harness runs on every step:**
-   - `format`: the formatter writes files, e.g. `prettier --write .`
-   - `check`: everything that must pass before a commit, e.g. `tsc --noEmit && eslint . && prettier --check . && vitest run`
-   - `test`: the tests, once
-
-   **`check` must pass on the install commit**, before any feature exists. A test runner fails with no tests and `tsc` fails with no source files. So either add one placeholder source file and one trivial test, or configure the runner to pass with no tests (Vitest: `passWithNoTests: true`). Remove the placeholder when the first item adds real code. If `check` doesn't exist, the agent has nothing to stop it from committing broken code.
+   Add `--profile netlify` if the project deploys to Netlify (see "Profiles"). The installer never overwrites an existing file; it lists the ones it kept. It adds the `audit:*` and `context:profile` npm scripts. **Then run `format`:** the installed Markdown and JSON aren't in your formatter's style yet, and `check` would fail on them.
 
 4. **Fill in the fields.** Every `{{FIELD}}` in the installed files is a decision only you can make:
    - **`CLAUDE.md`:** what the product is and for whom, the stack with pinned versions, approved dependencies, code standards, commands. **Required before the first session.**
