@@ -24,7 +24,7 @@
     "verify:persistence": "node scripts/verify-persistence.mjs",
     "verify:todos": "node scripts/verify-todos.mjs",
     "verify:prod": "node scripts/verify-prod.mjs",
-    "serve:prod": "netlify serve --offline",
+    "serve:prod": "node scripts/serve-prod.mjs",
     "deploy:preview": "netlify deploy --build",
     "deploy:prod": "netlify deploy --build --prod",
     "context:profile": "node scripts/context-profile.mjs",
