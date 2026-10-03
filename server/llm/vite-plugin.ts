@@ -2,6 +2,7 @@ import { loadEnv, type Connect, type Plugin } from 'vite';
 import { LLM_CONFIG } from './config.ts';
 import type { Env } from './engine.ts';
 import { createChatHandler, createEngineInfoHandler } from './handler.ts';
+import { knowledgeDirCandidates, loadKnowledge } from './knowledge.ts';
 
 /**
  * Serves the chat endpoint from Vite's own dev and preview servers (ADR-08), so the app still
@@ -10,8 +11,11 @@ import { createChatHandler, createEngineInfoHandler } from './handler.ts';
  */
 export function llmApi(): Plugin {
   let env: Env = {};
+  let root = process.cwd();
   const mount = (middlewares: Connect.Server) => {
-    const handleChat = createChatHandler({ env: () => env });
+    // Once per server start, and only when serving: builds and tests don't read the documents.
+    const knowledge = loadKnowledge(knowledgeDirCandidates(root, undefined));
+    const handleChat = createChatHandler({ env: () => env, knowledge });
     const handleEngineInfo = createEngineInfoHandler({ env: () => env });
     middlewares.use(LLM_CONFIG.route, (req, res, next) => {
       handleChat(req, res).catch(next);
@@ -25,6 +29,7 @@ export function llmApi(): Plugin {
     configResolved(config) {
       const envDir = typeof config.envDir === 'string' ? config.envDir : config.root;
       env = { ...loadEnv(config.mode, envDir, ''), ...process.env };
+      root = config.root;
     },
     configureServer(server) {
       mount(server.middlewares);

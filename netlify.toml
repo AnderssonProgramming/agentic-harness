@@ -9,3 +9,5 @@
 
 [functions]
   directory = "netlify/functions"
+  # The team's documents, read by the chat Function at cold start (B-06, ADR-12).
+  included_files = ["knowledge/**"]

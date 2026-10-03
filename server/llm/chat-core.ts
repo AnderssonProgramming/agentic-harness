@@ -6,6 +6,7 @@ import { selectEngine, type Env } from './engine.ts';
 import type { Engine, TokenUsage } from './engines/types.ts';
 import { IDLE_TIMEOUT } from './errors.ts';
 import { parseChatRequest, parseTodoRefs, trimHistory } from './history.ts';
+import { EMPTY_KNOWLEDGE, type KnowledgeBase } from './knowledge.ts';
 import { SYSTEM_PROMPT } from './system-prompt.ts';
 import { MAX_PROMPT_ADDITIONS, promptAdditionsLength } from './todo-tools.ts';
 
@@ -17,6 +18,11 @@ import { MAX_PROMPT_ADDITIONS, promptAdditionsLength } from './todo-tools.ts';
 export interface ChatCoreOptions {
   /** Read on every request, so tests and the verify script can change it. */
   env: () => Env;
+  /**
+   * The team's documents, loaded once per server start by the adapter's owner (B-06). Each engine
+   * gets its own budgeted text, appended to the system prompt. None by default.
+   */
+  knowledge?: KnowledgeBase;
   engineFor?: (env: Env) => Engine;
   idleTimeoutMs?: number;
   /** Overrides the per-engine wait for the first chunk (`LLM_CONFIG.firstChunkTimeoutMs`), for tests. */
@@ -54,6 +60,7 @@ function logUsage(engine: Engine, usage: TokenUsage): void {
 export async function runChat(
   {
     env,
+    knowledge = EMPTY_KNOWLEDGE,
     engineFor = selectEngine,
     idleTimeoutMs = LLM_CONFIG.idleTimeoutMs,
     firstChunkTimeoutMs,
@@ -82,6 +89,9 @@ export async function runChat(
     const messages = trimHistory(parseChatRequest(body), LLM_CONFIG.historyChars);
     const todos = parseTodoRefs(body);
     // The per-field limits keep this under the bound; the check keeps the invariant if they change.
+    // The knowledge isn't part of it: the loader keeps it within its own budget, so the bound per
+    // engine is MAX_PROMPT_ADDITIONS plus that budget (maxPromptAdditions), and documents never
+    // make a request fail (B-06, Amendment 1).
     if (promptAdditionsLength(SYSTEM_PROMPT, todos) > MAX_PROMPT_ADDITIONS) {
       throw chatError(
         'bad_request',
@@ -101,7 +111,7 @@ export async function runChat(
     restartTimer(firstChunkTimeoutMs ?? LLM_CONFIG.firstChunkTimeoutMs[engine.name]);
     let usage = NO_TOKENS;
     for await (const chunk of engine.stream({
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + knowledge.text[engine.name],
       messages,
       todos,
       signal: upstream.signal,
