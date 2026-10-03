@@ -123,5 +123,5 @@ if (missingCore.length) {
   );
 }
 console.log(
-  'Next: fill the {{…}} fields (HARNESS.md, step 4), then run: node harness-kit/doctor.mjs <project dir>',
+  `Next: fill the {{…}} fields (HARNESS.md, step 4), then run: node "${join(kit, 'doctor.mjs')}" "${target}"`,
 );
