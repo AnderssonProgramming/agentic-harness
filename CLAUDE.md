@@ -33,6 +33,7 @@ These are the ONLY packages authorized. Anything not on this list requires my ap
 - Runtime: `react`, `react-dom`.
 - Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `@types/react`, `@types/react-dom`, `@types/node`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `@eslint-community/eslint-plugin-eslint-comments`, `eslint-config-prettier`, `globals`, `prettier`.
 - Test (dev, approved 2026-09-30 with the B-01 plan): `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`.
+- Deployment (dev, approved 2026-10-02 for week 8): `netlify-cli`, so the release skill can build and deploy reproducibly. Its types for Functions (`@netlify/functions`) may be added only if the adapter needs them.
 
 ## Code standards
 
