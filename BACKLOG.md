@@ -96,7 +96,7 @@ Acceptance criteria:
 - Clicking a source name shows the file content in a side panel.
 - If no document applies, the assistant says so explicitly instead of inventing a source.
 
-Status: pending
+Status: done (2026-10-03, delegated; evidence: `docs/evidence/b-07-verification.md`; design ADR-14, pending PO review)
 
 ## Priority 3
 

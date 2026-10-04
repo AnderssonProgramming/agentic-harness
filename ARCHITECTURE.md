@@ -23,6 +23,7 @@ Read this table first. Then open only the ADRs your task touches, e.g. `Grep "AD
 | [ADR-11](#adr-11-the-model-requests-to-do-actions-the-browser-runs-them-and-confirms)                              | The model requests to-do actions (`action` event); the browser runs them and confirms                                        | Accepted with corrections (B-12 update: "list" from storage on every engine)    | To-dos, protocol, tools      |
 | [ADR-12](#adr-12-b-06s-knowledge-base-goes-whole-into-the-system-prompt-within-a-total-budget-and-a-secrets-guard) | B-06: knowledge files go whole into the system prompt, with a total budget per engine and a secrets guard; no RAG            | Accepted with corrections, built (B-06); LLM-05's bound now per engine          | Knowledge base, prompt size  |
 | [ADR-13](#adr-13-one-transport-free-chat-core-with-a-node-adapter-and-a-web-adapter)                               | One transport-free chat core; a Node `(req, res)` adapter for Vite and a Web `Request` adapter for the two Netlify Functions | Active                                                                          | Server, endpoint, deployment |
+| [ADR-14](#adr-14-the-model-cites-the-browser-verifies-against-the-loaded-documents)                                | B-07: the model ends with a `Sources:` line; the browser checks each name against `GET /api/knowledge` and shows chips       | Proposed by the agent, pending PO review                                        | Citations, knowledge routes  |
 
 New ADRs add a row here in the same commit.
 
@@ -294,6 +295,25 @@ Rejected alternatives:
 
 - **Converting Node's `(req, res)` into a `Request` and back, with one Web handler only.** Rejected, because it would add a conversion layer to the dev server and lose the P-01 connection handling, which needs the Node response.
 - **A second copy of the handler for the Function.** Rejected by Decision 2 of the contract: two copies drift, and the limits are invariants (CLAUDE.md).
+
+## [ADR-14] The model cites, the browser verifies against the loaded documents
+
+Date: 2026-10-03. Status: **Proposed by the agent, pending PO review.** Written by the `feature-builder` subagent (delegation contract `docs/delegations/b-07-cited-answers.md`, Decisions 1 to 4).
+
+Decision:
+
+- **Prompt (a request, not the control).** `server/llm/system-prompt.ts` asks the model to end an answer that uses the team's documents with one line, `Sources: a.md, b.md`, and, when no document applies, to say so and write no Sources line.
+- **Server.** `server/llm/knowledge-route.ts` is transport-free like the chat core (ADR-13): `GET /api/knowledge` lists `[{ source, title }]` for the documents the **active engine** was given (B-06's guards already passed, ADR-12), and `GET /api/knowledge/<source>` returns one document's text from memory. A requested name is only looked up in that in-memory list. It never becomes a filesystem path, so `../`, absolute paths, a second `/` and undecodable escapes all get 404. Both adapters route it. In production it's served by the **engine** Function (`/api/knowledge` and `/api/knowledge/*` added to its `config.path`), under its 60-per-180-s rule. The free plan has no third rule.
+- **Browser.** `src/features/chat/model/citations.ts` parses the reply's last non-blank line on render (`parseSources`) and classifies each name against the fetched list (`classifySources`): `known` becomes a chip button, `unknown` stays visible as plain text marked "not a known document", and `unchecked` (the list couldn't be fetched) is plain text marked "couldn't be checked". Names are never dropped, and matching is exact. A streaming reply isn't parsed until it finishes. The text is still stored as received, Sources line included, so the stored shape doesn't change and no snapshot version bump is needed (ADR-10).
+- **Panel.** `useKnowledge` (in `hooks/`, called only by `ChatScreen`, ADR-04) fetches the list once and opens only a known document. The presentational `SourcePanel` shows it as plain text in a `<pre>`, takes focus, and closes with its button or Escape. `ChatScreen` keeps the opening chip in a ref and returns focus to it. On screens 40rem wide or narrower the panel covers the whole chat. Under `prefers-reduced-motion` it doesn't animate.
+
+Reason: the contract's Decision 1. A prompt is never the control (CLAUDE.md), so the claim "this came from X" is checked by the app against what the server actually loaded, and a wrong claim is visibly contradicted, not hidden.
+
+Rejected alternatives:
+
+- **Parse the Sources line on the server and send it as a new stream event.** Rejected: it would change the ADR-09 protocol and the stored shape, and a reload would lose the citations of older messages. Deriving them on render from the stored text works for every message, old ones included.
+- **Fuzzy-match near-miss names (case, a `knowledge/` prefix, a missing `.md`).** Rejected: guessing which document the model meant is exactly the kind of quiet repair CLAUDE.md forbids. A near miss is shown as "not a known document".
+- **Render the document as Markdown.** Rejected by Decision 3 (plain text). It would also need a dependency or a hand-written renderer, which would be an XSS surface.
 
 ## Inference engine
 

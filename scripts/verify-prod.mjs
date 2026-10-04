@@ -239,6 +239,30 @@ check(
   { ...branch.outcome, found: branchFound, needles: KNOWLEDGE_NEEDLES },
 );
 
+// --- 6b. The engine Function serves the loaded documents, and nothing else (B-07) ------------------
+// Not recorded in apiCalls: they go to the engine Function's own rule, not the chat's, and the
+// rate-limit count below stays as it was.
+const list = await get(new URL('/api/knowledge', base).href);
+const listed = (() => {
+  try {
+    return JSON.parse(list.text).map((doc) => doc.source);
+  } catch {
+    return null;
+  }
+})();
+const doc = await get(new URL('/api/knowledge/branch-naming.md', base).href);
+const outside = await get(new URL('/api/knowledge/..%2Fpackage.json', base).href);
+check(
+  'knowledge-route',
+  '/api/knowledge lists the loaded documents, serves one, and refuses a path outside the list (B-07)',
+  list.status === 200 &&
+    listed?.includes('branch-naming.md') &&
+    doc.status === 200 &&
+    doc.text.includes(KNOWLEDGE_NEEDLES[0]) &&
+    outside.status === 404,
+  { listed, document: doc.status, outside: outside.status },
+);
+
 // --- 7. Optional: the 7th API request within 3 minutes is refused --------------------------------
 if (rateLimit) {
   while (apiCalls.length < 7 && !apiCalls.some((call) => call.status === 429)) {
