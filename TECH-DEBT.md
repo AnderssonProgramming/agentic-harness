@@ -61,3 +61,10 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Where:** the server and the browser read different text to spot a to-do request. After a failed reply, the server merges the unanswered message with the new one (`fitHistory`), but the browser checks only the latest message. If the failed message was a to-do phrase and the new one is an ordinary question, the server holds the question back and the browser shows an empty reply.
 - **Why not now:** it predates B-12, and B-12 doesn't make it worse. The fix is to have both sides decide on the same text, which touches the shared history logic that ADR-09's invariants protect, so it deserves its own contract and property test.
 - **When to fix:** before the local engine is offered to anyone other than developers, or at the next change to `fitHistory`, whichever comes first.
+
+## [D-09] Every document in `knowledge/` is publicly readable (audit `371e1aa`, observation)
+
+- **Risk:** Low today, **High** the day a real team's internal documents are added.
+- **Where:** B-07 serves each loaded document at `GET /api/knowledge/<source>` (ADR-14), on the engine Function, protected only by its rate limit of 60 requests per 3 minutes. The secrets guard keeps key-like files out, but anything else in `knowledge/` is public.
+- **Why not now:** the deployed `knowledge/` holds a **sample** team's four documents, written to be public. Accounts or SSO is a product decision that Compass doesn't need yet (ADR-10: no backend accounts).
+- **When to fix:** **before any real team's documents go into `knowledge/`.** Put the app and both knowledge routes behind authentication, or keep the documents out of the public deploy. Add an audit criterion for it at the same time.
