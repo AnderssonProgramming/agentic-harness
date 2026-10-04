@@ -24,10 +24,10 @@ _Screen: the live site, empty, with the URL visible._
 
 Do the five steps from `ACCESO.md`, live, in one take:
 
-1. _"What's a good way to organize a React app by feature?"_ → "It streams from Claude, through a server function, so the key never reaches the browser."
-2. _"Give me a short example of the folder tree for that."_ → "It remembers the conversation."
-3. _"Remind me to ask Ana how deploys work."_ → "The to-do appears. The confirmation is built from what was **saved**, not from what the model claims. A model can't fake an action here."
-4. _"What's on my list?"_, then _"Mark the deploy one as done."_ → "It's checked off."
+1. Click **"What is our branch naming convention?"** → "It answers from the team's own documents, and cites the file."
+2. Click the **`branch-naming.md`** chip → "The original document, in a side panel. The app checked that this file exists; the model can't invent a source."
+3. _"How do we handle state management?"_ → "When the documents don't cover something, it says so, with no fake source."
+4. _"Remind me to ask Ana how deploys work."_, _"What's on my list?"_, _"Mark the deploy one as done."_ → "Real actions on stored data. The confirmation comes from what was saved."
 5. **Close the tab and reopen the URL** → "Everything is still there."
 
 ## 1:40 – 2:30 · The audit: before and after
@@ -65,9 +65,9 @@ _Screen: `TASKS.md`, "Before and after"._
 
 > "What I didn't expect: the dangerous mistakes weren't bugs, they were **quiet decisions**. The agent once chose to wipe unreadable data with no notice. Another time it trusted a prompt instead of the app. And a debugging flag printed an API key into a log, so I rotated it the same day. The harness got better each time, because every failure became a written rule with its cause.
 >
-> What's not finished: Compass doesn't know your team's real documents yet. That's B-06, already designed. And the release skill has one production run, not the three it needs to be officially listed.
+> What's not finished: all 13 backlog items are done, but Compass ships with a sample team's documents; a real team swaps in its own. The release skill has had only a couple of production runs, not the three it needs to be officially listed. Two Medium findings, and two other small items, are written-down debt.
 >
-> Next 30 days: CI on every push, three more releases, B-06, and this harness on a second real project."
+> Next 30 days: CI on every push, more releases until the release skill earns its listing, the debt with fired triggers, and this harness on a second real project."
 
 ## After recording
 
