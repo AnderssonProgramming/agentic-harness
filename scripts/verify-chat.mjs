@@ -2,6 +2,7 @@
 //   npm run verify:chat [-- <screenshot dir>]        mock engine: deterministic, free, offline-safe
 //   npm run verify:chat -- --live [<screenshot dir>]  a five-turn conversation with the engine in .env
 // Starts its own dev server. Exits non-zero if any criterion fails.
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createReport, openChrome, startApp } from './lib/chrome.mjs';
 
@@ -354,6 +355,110 @@ try {
         suggestionsLeft: sent.suggestions,
         inputFocused: afterPick.focused,
       }),
+    );
+
+    // Cited sources (B-07): the mock cites the document it matched, plus an invented name
+    await page.evaluate("document.querySelector('#composer-input').focus()");
+    await say('What is our branch naming convention? [mock:unknown_source]');
+    await idle();
+    // Chips appear once the list of loaded documents has arrived; wait for that state first,
+    // so the "not clickable" check below can't pass early.
+    await page.waitFor("!!document.querySelector('.message--assistant:last-child .source-chip')");
+    const chips = await page.evaluate(`(() => {
+      const reply = document.querySelector('.message--assistant:last-child');
+      return {
+        text: reply.querySelector('.message__text')?.textContent ?? '',
+        buttons: [...reply.querySelectorAll('button.source-chip')].map((b) => b.textContent),
+        unverified: [...reply.querySelectorAll('.source-chip--unverified')].map((s) => s.textContent),
+      };
+    })()`);
+    check(
+      'B-07 #1',
+      'A knowledge answer ends with its source as a chip, and the raw Sources line is gone',
+      JSON.stringify(chips.buttons) === '["branch-naming.md"]' && !/Sources:/.test(chips.text),
+      JSON.stringify({ buttons: chips.buttons }),
+    );
+    check(
+      'B-07 #3',
+      'An invented source is shown as "not a known document" and is not clickable',
+      JSON.stringify(chips.unverified) === '["invented-guide.md (not a known document)"]',
+      JSON.stringify(chips.unverified),
+    );
+    await page.evaluate(
+      "document.querySelector('.message--assistant:last-child button.source-chip').click()",
+    );
+    await page.waitFor("!!document.querySelector('.source-panel .source-panel__text')");
+    const onDisk = readFileSync('knowledge/branch-naming.md', 'utf8').replace(/\r/g, '');
+    const panel = await page.evaluate(`(() => {
+      const panel = document.querySelector('.source-panel');
+      return {
+        text: panel.querySelector('.source-panel__text').textContent.replace(/\\r/g, ''),
+        html: panel.querySelectorAll('.source-panel__text *').length,
+        focusInside: panel.contains(document.activeElement),
+        title: panel.querySelector('.source-panel__title')?.textContent ?? '',
+      };
+    })()`);
+    check(
+      'B-07 #2',
+      "Clicking the chip shows the file's content as plain text in a side panel, with focus inside",
+      panel.text === onDisk && panel.html === 0 && panel.focusInside,
+      JSON.stringify({
+        title: panel.title,
+        chars: panel.text.length,
+        focusInside: panel.focusInside,
+      }),
+    );
+    const viewport = await page.evaluate('({ w: innerWidth, h: innerHeight })');
+    await page.send('Emulation.setDeviceMetricsOverride', {
+      width: 375,
+      height: 700,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.send('Emulation.setEmulatedMedia', {
+      features: [
+        { name: 'prefers-color-scheme', value: 'light' },
+        { name: 'prefers-reduced-motion', value: 'reduce' },
+      ],
+    });
+    await page.settle();
+    const narrow = await page.evaluate(`(() => {
+      const p = document.querySelector('.source-panel').getBoundingClientRect();
+      const c = document.querySelector('.chat').getBoundingClientRect();
+      return {
+        covers: Math.abs(p.left - c.left) <= 1 && Math.abs(p.right - c.right) <= 1 &&
+          Math.abs(p.top - c.top) <= 1 && Math.abs(p.bottom - c.bottom) <= 1,
+        animation: getComputedStyle(document.querySelector('.source-panel')).animationName,
+      };
+    })()`);
+    await page.screenshot(join(OUT, 'b-07-source-panel-narrow.png'));
+    check(
+      'B-07 #2',
+      'On a narrow screen the panel covers the chat; no motion under prefers-reduced-motion',
+      narrow.covers && narrow.animation === 'none',
+      JSON.stringify(narrow),
+    );
+    await page.send('Emulation.setDeviceMetricsOverride', {
+      width: viewport.w,
+      height: viewport.h,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.setColorScheme('light');
+    await page.settle();
+    await page.screenshot(join(OUT, 'b-07-source-panel.png'));
+    const escape = { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 };
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...escape });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...escape });
+    await page.waitFor("!document.querySelector('.source-panel')");
+    const returned = await page.evaluate(
+      "document.activeElement?.matches('.message--assistant:last-child button.source-chip') ?? false",
+    );
+    check(
+      'B-07 #2',
+      'Escape closes the panel and focus returns to the chip',
+      returned,
+      `focus on chip: ${String(returned)}`,
     );
 
     // Five turns with context, in a fresh conversation (a reload restores the chat since B-08)
