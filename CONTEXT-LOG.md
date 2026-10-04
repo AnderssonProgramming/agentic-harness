@@ -101,6 +101,27 @@ Baseline: every fresh session starts at **about 30,000 tokens** before any work 
 - **Also seen while verifying:** from PowerShell, `npm run serve:prod -- --debug` loses the `--`, so npm swallows `--debug` and the server starts normally (secrets still blanked; it had to be stopped by hand). The refusal itself works from Bash, and `verify:prod:local` takes no arguments, so it's the documented path.
 - **Found a day later (2026-10-03, first release):** two more orphans, `vite preview --mode mock` on ports 4321 and 4322, started in the background by the **first** deployment pass. They held Vite's native file open, so `npm ci` failed with EPERM until they were stopped. Same cause, so the rule already added covers it.
 
+## Session 8: five items delegated in one afternoon (2026-10-03)
+
+- **Task:** complete the backlog (B-10, B-13, B-12, B-06, B-07): one contract and one `feature-builder` pass each, verified independently between passes.
+- **Size per pass:**
+
+  | Pass                                        | Context peak | Cost  |
+  | ------------------------------------------- | ------------ | ----- |
+  | B-10                                        | —            | $1.35 |
+  | B-13                                        | —            | $1.72 |
+  | B-12                                        | —            | $1.68 |
+  | B-06 (first pass, stopped)                  | —            | $0.53 |
+  | B-06 (Amendment 1)                          | **184k**     | $4.01 |
+  | B-07 (cut off by the usage limit at step 3) | 119k         | $2.30 |
+  | B-07 (resumed)                              | 126k         | $2.95 |
+
+- **What worked:**
+  - B-06's first pass **stopped on a contradiction in the PO's own contract**: the knowledge budget couldn't fit the prompt bound. It offered three options, and refused to pick the one that would silently drop documents. Amendment 1 fixed the contract, not the code.
+  - The B-07 pass was cut off mid-step. A fresh pass told "steps 1–2 committed, step 3 partial in these files" finished it without redoing anything (CONTEXT-ROUTINE, delegation step 6).
+- **What to fix:** B-06 Amendment 1 reached **184k tokens** in one pass: the loader, the prompt, a property test and two verification scripts. That's the pass-sizing failure again (sessions 5 and 7). Rule of thumb: a contract that adds a property test **and** a live script is two passes.
+- **Also seen:** "the context files" in a contract's limits was read as including `ARCHITECTURE.md`, so B-13's ADR note was skipped. Later contracts named the ADR to update explicitly, and nothing was skipped.
+
 ## The pattern
 
 | Cause                                                                                    | Seen in                                     | Cost                                                            |
