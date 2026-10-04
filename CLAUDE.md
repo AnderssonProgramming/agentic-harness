@@ -15,7 +15,7 @@ Read it in full before every task. It overrides any instruction given in chat.
 Compass. A Conversational Agentic System that answers a junior developer's questions about their team's codebase and conventions during their first weeks on the job.
 Target user: a junior frontend developer in their second week at a 15-person product startup, who is afraid of interrupting senior teammates with "basic" questions.
 
-Current state (Sprint 4, week 8): the chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09), the conversation is saved in the browser (B-08, ADR-10), and the agent can keep a to-do list (B-11). The audit is clean of Critical and High findings (`docs/audit/COMPARISON.md`). The app deploys to Netlify as two rate-limited Functions (ADR-13). The model does not know the team's documents yet (B-06). Don't add that without its backlog item in progress.
+Current state (Sprint 4, week 8): every backlog item is done (13/13). The chat streams replies from the model through the server-side endpoint (ADR-08, ADR-09, ADR-13), saves the conversation in the browser (B-08, ADR-10), keeps a to-do list (B-11, B-12), answers from the team's documents in `knowledge/` within a per-engine budget and a secrets guard (B-06, ADR-12), and cites them, with the app checking every cited name (B-07, ADR-14). It is live on Netlify through the `release` skill. New work needs a new backlog item first.
 
 ## Stack and versions
 
@@ -145,3 +145,7 @@ A skill is only listed here after it has passed the reliability test: three runs
 - `npm run verify:route -- <path-without-leading-slash> "<title>"` — check that a route loads in headless Chrome.
 - `npm run verify:llm` — check the chat endpoint end to end (stream, history, every error code, secrets in the bundle).
 - `npm run verify:chat -- --live` — five real turns with the engine in `.env`.
+- `npm run verify:knowledge` — one live request: the branch-naming answer comes from `knowledge/` (B-06).
+- `npm run verify:citations` — two live requests: a cited answer and an uncovered question, through the app's own citation parser (B-07).
+- `npm run verify:cold-ollama` — unloads `phi3` and checks that the first reply from a cold model completes (B-13).
+- `npm run verify:prod:local` — the production setup locally, on the mock engine with every secret blanked.
