@@ -58,3 +58,7 @@ One uncounted observation: the HTTP 429 → `rate_limit` path (`src/shared/llm/c
 ## Release run (`6cbab8e`, 2026-10-03)
 
 Re-run because the release gate's dependency check changed (`scripts/`). Same result as `2a0eec9`: 0 Critical, 0 High, 2 Medium (PER-01 = D-01, PERF-01 = D-02). **Triage: no change.** The run hit TECH-DEBT D-05 again: `verify:chat` failed three times until it got a folder that already existed.
+
+## 13/13 run (`371e1aa`, 2026-10-03)
+
+After B-06, B-07, B-10, B-12 and B-13 (44 code files changed), every code-reading criterion was re-read against the new code. Same counts: 0 Critical, 0 High, 2 Medium (D-01, D-02). LLM-05 passes under B-06's per-engine bound (Amendment 1). **Triage:** no change to the findings. The observation that `knowledge/` documents are publicly readable becomes TECH-DEBT **D-09**, with the trigger "before real team documents go in". The provider-error-text observation is the existing D-03.
