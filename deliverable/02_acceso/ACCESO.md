@@ -44,7 +44,7 @@ npm run dev
 
 Open http://localhost:5173. In `.env`, set `ANTHROPIC_API_KEY=<your key>` to use Claude, or `INFERENCE_ENGINE=mock` to try the interface with no key (it echoes your message, but still performs simple to-do phrases). Restart `npm run dev` after changing `.env`.
 
-**Checked on 2026-10-03** against production:
+**Checked on 2026-10-04** against production (v0.3.0):
 
-- `npm run verify:prod -- https://agentichs.netlify.app` passed 6/6 checks (the page, the scripts, no secrets in the served files, the engine, a short and a long streamed reply);
+- `npm run verify:prod -- https://agentichs.netlify.app` passed 8/8 checks (the page, the scripts, no secrets in the served files, the engine, a short and a long streamed reply, an answer from the team documents, and the document route refusing outside paths);
 - a live request with "Remind me to read the team ADRs" returned a real `add` action.

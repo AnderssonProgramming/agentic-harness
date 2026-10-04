@@ -22,7 +22,7 @@ Every link below opens the file on GitHub (`main`).
 ## Also useful
 
 - **Release and deployment:**
-  - [v0.2.0 notes and deployment record](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/releases/v0.2.0.md)
+  - release notes and deployment records: [v0.2.0](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/releases/v0.2.0.md), [v0.3.0](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/releases/v0.3.0.md)
   - [DEPLOYMENTS.md](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/releases/DEPLOYMENTS.md)
 - **Final retrospective:** [final-retro.md](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/final-retro.md)
 - **Every deliverable, week by week:** [certification.md](https://github.com/AnderssonProgramming/agentic-harness/blob/main/docs/certification.md)
@@ -31,6 +31,6 @@ Every link below opens the file on GitHub (`main`).
 
 | Item                                        | Status                                                                                                                                                                                                                                                                                                                            |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `release` skill                             | It works: it made the v0.2.0 release, and it stopped correctly three times on real problems before publishing. But it has **1 production run, not the 3 clean runs** the harness requires before a skill is listed in `CLAUDE.md`, so it isn't listed yet                                                                         |
+| `release` skill                             | It works: it made the v0.2.0 and v0.3.0 releases, and on the first one it stopped correctly three times on real problems before publishing. But it has **2 production runs, 1 of them clean, not the 3 clean runs** the harness requires before a skill is listed in `CLAUDE.md`, so it isn't listed yet                          |
 | Backlog                                     | **All 13 items are `done`**, each with evidence in `docs/evidence/`. The last five (B-06, B-07, B-10, B-12, B-13) were delegated on 2026-10-03 through one contract each (`docs/delegations/`) and verified independently. B-06 needed a contract amendment after its first pass refused a contradiction in the PO's own contract |
 | Two Medium audit findings (PER-01, PERF-01) | **Deferred as debt** D-01 and D-02, each with the condition that turns it into work                                                                                                                                                                                                                                               |
