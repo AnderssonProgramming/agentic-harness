@@ -1,3 +1,4 @@
+import type { KnowledgeDoc } from '../../../shared/llm/protocol';
 import type { Message } from '../model/message';
 import { STARTER_QUESTIONS } from '../model/starter-questions';
 import { ReplyBody } from './reply-body';
@@ -8,11 +9,20 @@ interface MessageListProps {
   onRetry: (replyId: string) => void;
   /** Sends a starter question from the empty state (B-10). */
   onAsk: (question: string) => void;
+  /** The loaded documents replies' Sources lines are checked against (B-07). */
+  documents: readonly KnowledgeDoc[] | null;
+  onOpenSource: (source: string, chip: HTMLElement) => void;
 }
 
 const authorLabel = { user: 'You', assistant: 'Compass' } as const;
 
-export function MessageList({ messages, onRetry, onAsk }: MessageListProps) {
+export function MessageList({
+  messages,
+  onRetry,
+  onAsk,
+  documents,
+  onOpenSource,
+}: MessageListProps) {
   if (messages.length === 0) {
     return (
       <div className="chat-empty">
@@ -43,7 +53,13 @@ export function MessageList({ messages, onRetry, onAsk }: MessageListProps) {
           {message.author === 'user' ? (
             <p className="message__text">{message.text}</p>
           ) : (
-            <ReplyBody message={message} isLast={index === messages.length - 1} onRetry={onRetry} />
+            <ReplyBody
+              message={message}
+              isLast={index === messages.length - 1}
+              onRetry={onRetry}
+              documents={documents}
+              onOpenSource={onOpenSource}
+            />
           )}
         </li>
       ))}

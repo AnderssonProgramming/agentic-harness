@@ -10,6 +10,12 @@ vi.mock('../api/chat-api', () => ({
   sendChat: vi.fn(),
   getEngineInfo: vi.fn(() => Promise.resolve(null)),
 }));
+vi.mock('../api/knowledge-api', () => ({
+  getKnowledgeList: vi.fn(() =>
+    Promise.resolve([{ source: 'branch-naming.md', title: 'Branch naming' }]),
+  ),
+  getKnowledgeDocument: vi.fn(() => Promise.resolve('# Branch naming\n\nUse <type>/<id>.')),
+}));
 const mockedSend = vi.mocked(sendChat);
 
 afterEach(() => {
@@ -143,5 +149,28 @@ describe('ChatScreen', () => {
       );
     });
     full.mockRestore();
+  });
+
+  it('opens a cited document in the side panel and returns focus to its chip on Escape (B-07)', async () => {
+    mockedSend.mockImplementation((_history, { onDelta }) => {
+      onDelta('Use `feat/b-07-x`.\nSources: branch-naming.md, invented-guide.md');
+      return Promise.resolve();
+    });
+    const user = userEvent.setup();
+    render(<ChatScreen />);
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Branch names?{Enter}');
+
+    const chip = await screen.findByRole('button', { name: 'branch-naming.md' });
+    expect(screen.getByText('invented-guide.md')).toHaveTextContent('(not a known document)');
+    expect(screen.queryByRole('button', { name: /invented-guide/ })).not.toBeInTheDocument();
+
+    await user.click(chip);
+    const panel = await screen.findByRole('dialog', { name: /Branch naming/ });
+    await within(panel).findByText(/# Branch naming/);
+    expect(panel).toContainElement(document.activeElement as HTMLElement);
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(chip).toHaveFocus();
   });
 });
