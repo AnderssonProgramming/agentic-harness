@@ -28,8 +28,8 @@ export function MessageList({
       <div className="chat-empty">
         <h2>Ask Compass anything about your new team</h2>
         <p>
-          Pick a question to start, or type your own. Compass doesn&apos;t know your team&apos;s
-          documents yet, and says so.
+          Pick a question to start, or type your own. Answers from your team&apos;s documents name
+          their source, and Compass says so when the documents don&apos;t cover something.
         </p>
         <StarterQuestions questions={STARTER_QUESTIONS} onPick={onAsk} />
       </div>
