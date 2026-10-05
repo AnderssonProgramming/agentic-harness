@@ -62,3 +62,7 @@ Re-run because the release gate's dependency check changed (`scripts/`). Same re
 ## 13/13 run (`371e1aa`, 2026-10-03)
 
 After B-06, B-07, B-10, B-12 and B-13 (44 code files changed), every code-reading criterion was re-read against the new code. Same counts: 0 Critical, 0 High, 2 Medium (D-01, D-02). LLM-05 passes under B-06's per-engine bound (Amendment 1). **Triage:** no change to the findings. The observation that `knowledge/` documents are publicly readable becomes TECH-DEBT **D-09**, with the trigger "before real team documents go in". The provider-error-text observation is the existing D-03.
+
+## v0.3.1 run (`84d7865`, 2026-10-05)
+
+Only `src/app/app.css` changed (keeping the composer clear of Netlify's badge). Same counts: 0 Critical, 0 High, 2 Medium (D-01, D-02). `verify:chat` 28/28 now includes the new mobile row. One **intermittent** failure in `verify:persistence` (a reply streaming at close came back as `error` once, then `stopped` on rerun) is recorded as **D-10** with its diagnosis, not counted as a pass.
