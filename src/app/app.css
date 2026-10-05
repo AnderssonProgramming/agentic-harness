@@ -48,6 +48,15 @@ body {
   padding: 1rem;
 }
 
+/* Netlify injects a fixed "Powered by Netlify" badge (64 px tall, bottom right) on the public
+   site. Until the screen is wide enough for it to sit in the side margin, keep the composer
+   and its Send button above it. */
+@media (max-width: 75rem) {
+  .app {
+    padding-bottom: 5rem;
+  }
+}
+
 .app__header {
   display: flex;
   flex-wrap: wrap;
