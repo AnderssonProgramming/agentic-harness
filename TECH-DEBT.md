@@ -68,3 +68,10 @@ What we decided **not** to fix yet, and why. Debt that's written down is a decis
 - **Where:** B-07 serves each loaded document at `GET /api/knowledge/<source>` (ADR-14), on the engine Function, protected only by its rate limit of 60 requests per 3 minutes. The secrets guard keeps key-like files out, but anything else in `knowledge/` is public.
 - **Why not now:** the deployed `knowledge/` holds a **sample** team's four documents, written to be public. Accounts or SSO is a product decision that Compass doesn't need yet (ADR-10: no backend accounts).
 - **When to fix:** **before any real team's documents go into `knowledge/`.** Put the app and both knowledge routes behind authentication, or keep the documents out of the public deploy. Add an audit criterion for it at the same time.
+
+## [D-10] A reply cut off by closing the browser can come back as an error instead of "stopped" (audit `84d7865`, intermittent)
+
+- **Risk:** Low. The partial text is kept; only the label differs. The user sees "Can't reach the server" with Retry instead of "Stopped".
+- **Where:** `verify:persistence`, check "A reply still streaming at close comes back stopped". It failed once (`streaming → error`), then passed on rerun (`streaming → stopped`). Likely race: when the browser closes, the request fails, and the error handler in `src/features/chat/hooks/use-chat.ts:161-163` saves the reply as `error` before the page dies. On restore, only `streaming` replies become `stopped` (`conversation-snapshot.ts:94-101`).
+- **Why not now:** it predates v0.3.1 (B-08, week 5), it's cosmetic, and v0.3.1 only fixes a CSS overlap. Per CLAUDE.md it's a finding, not noise, so it's recorded with its diagnosis instead of being called a pass.
+- **When to fix:** the next change to the chat hook or the snapshot. First make it fail deterministically (abort the request during `pagehide`), then treat an abort caused by unload as `stopped`, and prove it with repeated passes under load.
