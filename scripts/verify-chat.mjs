@@ -438,6 +438,19 @@ try {
       narrow.covers && narrow.animation === 'none',
       JSON.stringify(narrow),
     );
+    // Netlify's public badge is a fixed 64 px iframe at the bottom right of the live site.
+    const clearance = await page.evaluate(`(() => {
+      const send = document.querySelector('.composer__send').getBoundingClientRect();
+      const input = document.querySelector('.composer__input').getBoundingClientRect();
+      return { sendBottom: Math.round(send.bottom), inputBottom: Math.round(input.bottom), viewport: innerHeight };
+    })()`);
+    check(
+      'Mobile',
+      'At 375 px, the composer and Send end above the bottom 64 px, where the hosting badge sits',
+      clearance.sendBottom <= clearance.viewport - 64 &&
+        clearance.inputBottom <= clearance.viewport - 64,
+      JSON.stringify(clearance),
+    );
     await page.send('Emulation.setDeviceMetricsOverride', {
       width: viewport.w,
       height: viewport.h,
